@@ -73,7 +73,7 @@ body {
   padding: 16px 26px 18px;
   border-radius: 22px;
   border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(12,10,26,0.5);
+  background: rgba(9,7,18,0.72);
   backdrop-filter: blur(16px) saturate(1.1);
   box-shadow: 0 24px 70px rgba(0,0,0,0.4);
 }
@@ -131,14 +131,20 @@ body {
   font-size: 26px;
   line-height: 1.7;
   letter-spacing: 0.5px;
-  max-height: 96px;
+  height: calc(1.7em * 3); /* three visible lines */
   overflow: hidden;
   white-space: pre-wrap;
   word-break: break-word;
 }
+.passage-inner {
+  display: block;
+  position: relative; /* be the offsetParent so caret.offsetTop is line-relative */
+  transition: transform 0.22s ease;
+  will-change: transform;
+}
 .ch { transition: color 0.08s; }
-.ch.done { color: var(--ink); }
-.ch.todo { color: #4a4570; }
+.ch.done { color: #ffffff; }
+.ch.todo { color: rgba(233,228,255,0.5); }
 .ch.current {
   color: var(--accent);
   background: rgba(95,240,208,0.16);
