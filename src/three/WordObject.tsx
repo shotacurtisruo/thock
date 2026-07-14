@@ -1,25 +1,45 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react"
 import { useFrame } from "@react-three/fiber"
 import { RoundedBox, Text } from "@react-three/drei"
-import type { Group } from "three"
-import { GAP, type ClimbObject } from "../game/config"
+import type { Group, Mesh, Material } from "three"
+import { GAP, type ClimbObject, type Shape } from "../game/config"
 import ObjectMesh from "./ObjectMesh"
 
 export type Variant = "segmented" | "long"
 export { GAP }
 
-/** A little burst of crumbs/shards that pops when a hard object cracks. */
-function Crumbs({ trigger, color }: { trigger: number; color: string }) {
+type BurstKind = "shard" | "splat" | "puff" | "drip" | "dust"
+const BURST: Record<BurstKind, { count: number; life: number }> = {
+  shard: { count: 8, life: 0.5 },
+  splat: { count: 6, life: 0.5 },
+  puff: { count: 6, life: 0.75 },
+  drip: { count: 5, life: 0.6 },
+  dust: { count: 6, life: 0.35 },
+}
+
+function burstKindFor(shape: Shape): BurstKind {
+  if (shape === "chocolate" || shape === "ice") return "shard"
+  if (shape === "jelly" || shape === "slime") return "splat"
+  if (shape === "marshmallow" || shape === "bubble") return "puff"
+  if (shape === "honey") return "drip"
+  if (shape === "butter") return "splat"
+  return "dust" // keycap
+}
+
+/** A material-flavored particle burst on landing: shards crack, jelly splats, marshmallow puffs, honey drips. */
+function Burst({ trigger, kind, color, y }: { trigger: number; kind: BurstKind; color: string; y: number }) {
   const grp = useRef<Group>(null)
   const life = useRef(0)
   const prevT = useRef(trigger)
+  const cfg = BURST[kind]
   const parts = useMemo(
     () =>
-      Array.from({ length: 8 }, (_, i) => {
-        const a = (i / 8) * Math.PI * 2 + i * 0.7
-        return { dx: Math.cos(a) * (0.5 + (i % 3) * 0.18), dz: Math.sin(a) * 0.4, vy: 1.4 + (i % 4) * 0.35, spin: i }
+      Array.from({ length: cfg.count }, (_, i) => {
+        const a = (i / cfg.count) * Math.PI * 2 + Math.random() * 0.6
+        const r = 0.4 + Math.random() * 0.4
+        return { dx: Math.cos(a) * r, dz: Math.sin(a) * r * 0.7, vy: 1 + Math.random() * 0.8, spin: Math.random() * 6 }
       }),
-    []
+    [cfg.count]
   )
 
   useFrame((_, dt) => {
@@ -27,7 +47,7 @@ function Crumbs({ trigger, color }: { trigger: number; color: string }) {
     if (!g) return
     if (trigger !== prevT.current) {
       prevT.current = trigger
-      life.current = 0.5
+      life.current = cfg.life
     }
     if (life.current <= 0) {
       if (g.visible) g.visible = false
@@ -35,22 +55,45 @@ function Crumbs({ trigger, color }: { trigger: number; color: string }) {
     }
     g.visible = true
     life.current -= dt
-    const frac = life.current / 0.5 // 1 -> 0
-    const t = 1 - frac // 0 -> 1
-    g.children.forEach((child, i) => {
+    const frac = Math.max(0, life.current / cfg.life) // 1 -> 0
+    const t = 1 - frac
+    g.children.forEach((ch, i) => {
       const p = parts[i]
-      child.position.set(p.dx * t * 1.6, p.vy * t - 3.2 * t * t, p.dz * t * 1.6)
-      child.scale.setScalar(Math.max(0.001, frac))
-      child.rotation.set(t * p.spin * 5, t * p.spin * 4, 0)
+      if (!p) return
+      let px = p.dx, py = 0, pz = p.dz, sx = 1, sy = 1, sz = 1, op = 1
+      if (kind === "shard") {
+        px = p.dx * t * 1.6; py = p.vy * t - 3.2 * t * t; pz = p.dz * t * 1.6; sx = sy = sz = frac
+        ch.rotation.set(t * p.spin * 5, t * p.spin * 4, 0)
+      } else if (kind === "splat") {
+        px = p.dx * t * 2; py = p.vy * 0.5 * t - 3.6 * t * t; pz = p.dz * t * 2; sx = sz = frac * 1.2; sy = frac * 0.4; op = frac
+      } else if (kind === "puff") {
+        px = p.dx * t * 0.7; py = 0.9 * t; pz = p.dz * t * 0.7; sx = sy = sz = 0.5 + t * 1.1; op = frac * 0.8
+      } else if (kind === "drip") {
+        px = p.dx * t * 0.5; py = -1.3 * t - 1.4 * t * t; pz = p.dz * t * 0.5; sx = sy = sz = frac; op = 0.9
+      } else {
+        px = p.dx * t * 1.3; py = 0.5 * t; pz = p.dz * t * 1.3; sx = sy = sz = frac * 0.7; op = frac * 0.5
+      }
+      ch.position.set(px, py, pz)
+      ch.scale.set(sx, sy, sz)
+      const m = (ch as Mesh).material as Material & { opacity: number }
+      if (m && "opacity" in m) m.opacity = op
     })
   })
 
+  const goo = kind === "splat" || kind === "drip"
+  const size = kind === "shard" ? 0.11 : kind === "dust" ? 0.07 : kind === "puff" ? 0.12 : 0.1
   return (
-    <group ref={grp} visible={false} position={[0, 0.2, 0]}>
+    <group ref={grp} visible={false} position={[0, y, 0]}>
       {parts.map((_, i) => (
         <mesh key={i}>
-          <tetrahedronGeometry args={[0.11]} />
-          <meshStandardMaterial color={color} roughness={0.5} />
+          {kind === "shard" ? <tetrahedronGeometry args={[size]} /> : <sphereGeometry args={[size, 10, 8]} />}
+          {goo ? (
+            <meshPhysicalMaterial color={color} roughness={0.12} transmission={0.4} thickness={0.4} clearcoat={1} transparent />
+          ) : kind === "dust" ? (
+            <meshBasicMaterial color={color} transparent />
+          ) : (
+            <meshStandardMaterial color={color} roughness={kind === "puff" ? 1 : 0.5} transparent />
+          )}
         </mesh>
       ))}
     </group>
@@ -96,10 +139,10 @@ function LetterPiece({ object, char, index, blobSlot, typedCount }: { object: Cl
   useEffect(() => {
     if (hasBlob && !wasBlob.current) {
       impact.current = 1 // blob just landed here
-      if (style === "crack") setBurst((b) => b + 1)
+      setBurst((b) => b + 1) // every landing bursts its material's particles
     }
     wasBlob.current = hasBlob
-  }, [hasBlob, style])
+  }, [hasBlob])
 
   useFrame((_, dt) => {
     const el = g.current
@@ -120,11 +163,9 @@ function LetterPiece({ object, char, index, blobSlot, typedCount }: { object: Cl
   return (
     <group ref={g}>
       <ObjectMesh object={object} char={char} glow={glow} />
+      <Burst trigger={burst} kind={burstKindFor(object.shape)} color={object.color} y={object.halfHeight + 0.05} />
       {style === "crack" && (
-        <>
-          <CrackLines groupRef={crack} color={object.shape === "ice" ? "#eaffff" : "#1c0f07"} y={object.halfHeight + 0.02} />
-          <Crumbs trigger={burst} color={object.color} />
-        </>
+        <CrackLines groupRef={crack} color={object.shape === "ice" ? "#eaffff" : "#1c0f07"} y={object.halfHeight + 0.02} />
       )}
       {/* per-key RGB glow under the key the character is standing on */}
       {isKeycap && hasBlob && (
