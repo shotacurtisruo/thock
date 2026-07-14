@@ -25,10 +25,28 @@ interface GameState {
   startTime: number | null
   weather: Weather
   keycap: "mt3" | "xda"
+  character: CharacterLook
 
   reset: () => void
   press: (char: string) => PressResult | null
   toggleKeycap: () => void
+  setChar: (part: keyof CharacterLook, value: string) => void
+}
+
+export interface CharacterLook {
+  skin: string
+  hair: string
+  shirt: string
+}
+
+const DEFAULT_CHAR: CharacterLook = { skin: "#f2c79a", hair: "#3a2a20", shirt: "#4fb0e0" }
+
+function loadChar(): CharacterLook {
+  try {
+    const raw = localStorage.getItem("thock-char")
+    if (raw) return { ...DEFAULT_CHAR, ...JSON.parse(raw) }
+  } catch {}
+  return DEFAULT_CHAR
 }
 
 const FLOW_GAIN = 0.045
@@ -54,8 +72,18 @@ export const useGame = create<GameState>((set, get) => ({
   startTime: null,
   weather: weatherFor(0),
   keycap: "mt3",
+  character: loadChar(),
 
   toggleKeycap: () => set((s) => ({ keycap: s.keycap === "mt3" ? "xda" : "mt3" })),
+
+  setChar: (part, value) =>
+    set((s) => {
+      const character = { ...s.character, [part]: value }
+      try {
+        localStorage.setItem("thock-char", JSON.stringify(character))
+      } catch {}
+      return { character }
+    }),
 
   reset: () =>
     set({ ...fresh(), errors: 0, keystrokes: 0, streak: 0, flow: 0, startTime: null, weather: weatherFor(0) }),

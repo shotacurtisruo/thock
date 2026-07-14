@@ -1,10 +1,10 @@
 // Shared geometry, object/material, weather, and musical constants for the climb.
 
 // --- Word-based climb: one word = one object; blob runs across its letters ---
-export const GAP = 1.15 // spacing between letters within a word-object
-export const WORD_RADIUS = 6.5 // spiral radius of word rows
-export const WORD_ANGLE = 1.3 // radians between consecutive words
-export const WORD_RISE = 1.8 // vertical gain per word (more vertical separation)
+export const GAP = 1.0 // spacing between letters within a word-object
+export const WORD_RADIUS = 5.5 // spiral radius of word rows
+export const WORD_ANGLE = 0.82 // radians between consecutive words (tighter = shorter jumps)
+export const WORD_RISE = 1.05 // vertical gain per word
 export const ZONE_SIZE = 3 // words per material zone
 export const WEATHER_SIZE = 9 // words per weather (3 material zones)
 

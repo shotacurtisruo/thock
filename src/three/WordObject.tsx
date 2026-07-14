@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react"
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react"
 import { useFrame } from "@react-three/fiber"
 import { RoundedBox, Text } from "@react-three/drei"
 import type { Group } from "three"
@@ -7,6 +7,55 @@ import ObjectMesh from "./ObjectMesh"
 
 export type Variant = "segmented" | "long"
 export { GAP }
+
+/** A little burst of crumbs/shards that pops when a hard object cracks. */
+function Crumbs({ trigger, color }: { trigger: number; color: string }) {
+  const grp = useRef<Group>(null)
+  const life = useRef(0)
+  const prevT = useRef(trigger)
+  const parts = useMemo(
+    () =>
+      Array.from({ length: 8 }, (_, i) => {
+        const a = (i / 8) * Math.PI * 2 + i * 0.7
+        return { dx: Math.cos(a) * (0.5 + (i % 3) * 0.18), dz: Math.sin(a) * 0.4, vy: 1.4 + (i % 4) * 0.35, spin: i }
+      }),
+    []
+  )
+
+  useFrame((_, dt) => {
+    const g = grp.current
+    if (!g) return
+    if (trigger !== prevT.current) {
+      prevT.current = trigger
+      life.current = 0.5
+    }
+    if (life.current <= 0) {
+      if (g.visible) g.visible = false
+      return
+    }
+    g.visible = true
+    life.current -= dt
+    const frac = life.current / 0.5 // 1 -> 0
+    const t = 1 - frac // 0 -> 1
+    g.children.forEach((child, i) => {
+      const p = parts[i]
+      child.position.set(p.dx * t * 1.6, p.vy * t - 3.2 * t * t, p.dz * t * 1.6)
+      child.scale.setScalar(Math.max(0.001, frac))
+      child.rotation.set(t * p.spin * 5, t * p.spin * 4, 0)
+    })
+  })
+
+  return (
+    <group ref={grp} visible={false} position={[0, 0.2, 0]}>
+      {parts.map((_, i) => (
+        <mesh key={i}>
+          <tetrahedronGeometry args={[0.11]} />
+          <meshStandardMaterial color={color} roughness={0.5} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
 
 type Landing = "press" | "crack" | "pop" | "squish"
 function landingFor(shape: ClimbObject["shape"]): Landing {
@@ -37,15 +86,20 @@ function LetterPiece({ object, char, index, blobSlot, typedCount }: { object: Cl
   const crack = useRef<Group>(null)
   const impact = useRef(0)
   const wasBlob = useRef(false)
+  const [burst, setBurst] = useState(0)
   const typed = index < typedCount
   const hasBlob = index === blobSlot
   const glow = hasBlob ? 0.5 : typed ? 0.06 : 0
   const style = landingFor(object.shape)
+  const isKeycap = object.shape === "keycap"
 
   useEffect(() => {
-    if (hasBlob && !wasBlob.current) impact.current = 1 // blob just landed here
+    if (hasBlob && !wasBlob.current) {
+      impact.current = 1 // blob just landed here
+      if (style === "crack") setBurst((b) => b + 1)
+    }
     wasBlob.current = hasBlob
-  }, [hasBlob])
+  }, [hasBlob, style])
 
   useFrame((_, dt) => {
     const el = g.current
@@ -67,7 +121,17 @@ function LetterPiece({ object, char, index, blobSlot, typedCount }: { object: Cl
     <group ref={g}>
       <ObjectMesh object={object} char={char} glow={glow} />
       {style === "crack" && (
-        <CrackLines groupRef={crack} color={object.shape === "ice" ? "#eaffff" : "#1c0f07"} y={object.halfHeight + 0.02} />
+        <>
+          <CrackLines groupRef={crack} color={object.shape === "ice" ? "#eaffff" : "#1c0f07"} y={object.halfHeight + 0.02} />
+          <Crumbs trigger={burst} color={object.color} />
+        </>
+      )}
+      {/* per-key RGB glow under the key the character is standing on */}
+      {isKeycap && hasBlob && (
+        <mesh position={[0, -0.22, 0]}>
+          <boxGeometry args={[1.0, 0.14, 1.0]} />
+          <meshBasicMaterial color="#5ff0d0" toneMapped={false} transparent opacity={0.85} />
+        </mesh>
       )}
     </group>
   )
@@ -194,11 +258,17 @@ export default function WordObject({ object, word, variant, blobSlot = -1, typed
   if (variant === "segmented") {
     return (
       <group>
-        {/* keyboard base plate under the keys */}
+        {/* keyboard base plate + RGB underglow */}
         {object.shape === "keycap" && (
-          <RoundedBox args={[n * GAP + 0.4, 0.24, 1.5]} radius={0.1} smoothness={4} position={[0, -0.34, 0]}>
-            <meshPhysicalMaterial color="#1c2029" roughness={0.5} clearcoat={0.3} />
-          </RoundedBox>
+          <>
+            <RoundedBox args={[n * GAP + 0.4, 0.24, 1.5]} radius={0.1} smoothness={4} position={[0, -0.34, 0]}>
+              <meshPhysicalMaterial color="#1c2029" roughness={0.5} clearcoat={0.3} />
+            </RoundedBox>
+            <mesh position={[0, -0.52, 0]}>
+              <boxGeometry args={[n * GAP + 0.55, 0.1, 1.65]} />
+              <meshBasicMaterial color="#7ad0ff" toneMapped={false} />
+            </mesh>
+          </>
         )}
         {chars.map((ch, i) => (
           <group key={i} position={[slot(i), 0, 0]}>

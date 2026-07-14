@@ -4,7 +4,7 @@ import { Vector3 } from "three"
 import { useGame } from "../game/store"
 import { objectFor, slotWorldPos, wordCenter } from "../game/config"
 import Tower from "./Tower"
-import Blob from "./Blob"
+import Character from "./Character"
 import Weather from "./Weather"
 
 const CAM_LIFT = 3.2
@@ -66,7 +66,7 @@ export default function Scene() {
       <Lighting />
       <Weather />
       <Tower />
-      <Blob />
+      <Character />
       <ClimbCamera />
     </Canvas>
   )

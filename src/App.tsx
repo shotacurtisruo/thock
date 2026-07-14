@@ -5,12 +5,14 @@ import KeycapGallery from "./three/KeycapGallery"
 import DesignLab from "./three/DesignLab"
 import TypingBar from "./ui/TypingBar"
 import Hud from "./ui/Hud"
+import Customizer from "./ui/Customizer"
 import { useGame } from "./game/store"
 import { audio } from "./audio/AudioEngine"
 import { panForWord } from "./game/config"
 
 export default function App() {
   const [started, setStarted] = useState(false)
+  const [customizing, setCustomizing] = useState(false)
   const weather = useGame((s) => s.weather)
 
   // Showcases: /?gallery (all objects) · /?keycaps (keycap profiles)
@@ -80,6 +82,8 @@ export default function App() {
       >
         <Scene />
         <div className="brand">thock</div>
+        <button className="me-btn" onClick={() => setCustomizing(true)} title="Customize character">👤</button>
+        {customizing && <Customizer onClose={() => setCustomizing(false)} />}
         {!started && (
           <div className="hint">
             <p>start typing to climb</p>
