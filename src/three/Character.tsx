@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react"
 import { useFrame } from "@react-three/fiber"
-import { CanvasTexture, NearestFilter, DoubleSide, Vector3, type Group, type Mesh } from "three"
+import { CanvasTexture, NearestFilter, DoubleSide, Vector3, MathUtils, type Group, type Mesh } from "three"
 import { useGame, type CharacterLook } from "../game/store"
 import { objectFor, slotWorldPos } from "../game/config"
 
@@ -10,7 +10,6 @@ const SCALE = 8
 const SPRITE_W = 1.0
 const SPRITE_H = 1.5
 
-/** Paint the little pixel human onto a canvas. */
 export function drawChar(look: CharacterLook): HTMLCanvasElement {
   const c = document.createElement("canvas")
   c.width = PXW * SCALE
@@ -27,26 +26,26 @@ export function drawChar(look: CharacterLook): HTMLCanvasElement {
   const dark = "#20161a"
   const blush = "#ff9ec2"
 
-  px(hair, 3, 1, 10, 5) // hair back/top
-  px(hair, 3, 4, 2, 5) // left sideburn
-  px(hair, 11, 4, 2, 5) // right sideburn
-  px(skin, 4, 4, 8, 8) // face
-  px(skin, 3, 7, 1, 2) // ears
+  px(hair, 3, 1, 10, 5)
+  px(hair, 3, 4, 2, 5)
+  px(hair, 11, 4, 2, 5)
+  px(skin, 4, 4, 8, 8)
+  px(skin, 3, 7, 1, 2)
   px(skin, 12, 7, 1, 2)
-  px(hair, 4, 4, 8, 1) // fringe
-  px(dark, 6, 7, 1, 2) // eyes
+  px(hair, 4, 4, 8, 1)
+  px(dark, 6, 7, 1, 2)
   px(dark, 9, 7, 1, 2)
-  px(blush, 5, 9, 1, 1) // blush
+  px(blush, 5, 9, 1, 1)
   px(blush, 10, 9, 1, 1)
-  px(dark, 7, 10, 2, 1) // mouth
-  px(skin, 6, 12, 4, 1) // neck
-  px(shirt, 4, 13, 8, 5) // shirt
-  px(skin, 2, 13, 2, 5) // arms
+  px(dark, 7, 10, 2, 1)
+  px(skin, 6, 12, 4, 1)
+  px(shirt, 4, 13, 8, 5)
+  px(skin, 2, 13, 2, 5)
   px(skin, 12, 13, 2, 5)
-  px(pants, 4, 18, 8, 3) // pants
-  px(pants, 4, 21, 3, 2) // legs
+  px(pants, 4, 18, 8, 3)
+  px(pants, 4, 21, 3, 2)
   px(pants, 9, 21, 3, 2)
-  px(shoe, 4, 23, 3, 1) // shoes
+  px(shoe, 4, 23, 3, 1)
   px(shoe, 9, 23, 3, 1)
   return c
 }
@@ -55,7 +54,6 @@ export function charDataURL(look: CharacterLook): string {
   return drawChar(look).toDataURL()
 }
 
-/** Crisp (nearest-filter) texture of the character for use in the 3D scene. */
 export function makeCharTexture(look: CharacterLook): CanvasTexture {
   const tex = new CanvasTexture(drawChar(look))
   tex.magFilter = NearestFilter
@@ -64,17 +62,26 @@ export function makeCharTexture(look: CharacterLook): CanvasTexture {
   return tex
 }
 
-/** The player's customizable pixel character, running the words as a billboard sprite. */
+const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10)
+
+/** The player's customizable pixel character — arcs between letters, tumbles on a fall. */
 export default function Character() {
   const look = useGame((s) => s.character)
   const tex = useMemo(() => makeCharTexture(look), [look.skin, look.hair, look.shirt])
 
   const group = useRef<Group>(null)
   const plane = useRef<Mesh>(null)
-  const target = useRef(new Vector3())
-  const prev = useRef(new Vector3())
+  const from = useRef(new Vector3())
+  const to = useRef(new Vector3())
+  const goal = useRef(new Vector3())
+  const t = useRef(1)
+  const dur = useRef(0.2)
+  const arc = useRef(0)
+  const falling = useRef(false)
+  const spin = useRef(0)
+  const inited = useRef(false)
 
-  useFrame(({ camera, clock }, dt) => {
+  useFrame(({ clock, camera }, dt) => {
     const g = group.current
     const p = plane.current
     if (!g || !p) return
@@ -82,22 +89,57 @@ export default function Character() {
     const W = baseWord + wi
     const len = words[wi]?.length ?? 1
     const slot = Math.min(ci, len - 1)
-    const [tx, ty, tz] = slotWorldPos(W, slot, len)
-    const footY = ty + objectFor(W).halfHeight
-    target.current.set(tx, footY, tz)
+    const [gx, gy, gz] = slotWorldPos(W, slot, len)
+    const footY = gy + objectFor(W).halfHeight
+    goal.current.set(gx, footY, gz)
 
-    prev.current.copy(g.position)
-    g.position.lerp(target.current, Math.min(1, dt * 9))
-    const speed = g.position.distanceTo(prev.current) / Math.max(dt, 1e-3)
-    const moving = Math.min(1, speed * 0.14)
+    if (!inited.current) {
+      g.position.copy(goal.current)
+      inited.current = true
+    }
 
-    const hop = Math.abs(Math.sin(clock.elapsedTime * 16)) * 0.14 * moving
+    // new destination -> start a tween (hop for up/sideways, tumble-fall for big drops)
+    if (goal.current.distanceToSquared(to.current) > 0.0004) {
+      from.current.copy(g.position)
+      to.current.copy(goal.current)
+      t.current = 0
+      const horiz = Math.hypot(goal.current.x - from.current.x, goal.current.z - from.current.z)
+      const drop = from.current.y - goal.current.y
+      falling.current = drop > 0.6
+      if (falling.current) {
+        dur.current = 0.4 + Math.min(0.4, drop * 0.12)
+        arc.current = 0
+      } else {
+        dur.current = MathUtils.clamp(0.13 + horiz * 0.04, 0.13, 0.4)
+        arc.current = Math.min(0.9, horiz * 0.16 + 0.14)
+      }
+    }
+
+    t.current = Math.min(1, t.current + dt / dur.current)
+    const tt = t.current
+    if (falling.current) {
+      const eXZ = smoother(tt)
+      const eY = tt * tt // accelerate downward like gravity
+      g.position.x = MathUtils.lerp(from.current.x, to.current.x, eXZ)
+      g.position.z = MathUtils.lerp(from.current.z, to.current.z, eXZ)
+      const bounce = tt > 0.92 ? Math.sin((tt - 0.92) / 0.08 * Math.PI) * 0.12 : 0
+      g.position.y = MathUtils.lerp(from.current.y, to.current.y, eY) + bounce
+      spin.current += dt * 12 // tumble
+    } else {
+      const e = smoother(tt)
+      g.position.x = MathUtils.lerp(from.current.x, to.current.x, e)
+      g.position.z = MathUtils.lerp(from.current.z, to.current.z, e)
+      g.position.y = MathUtils.lerp(from.current.y, to.current.y, e) + Math.sin(Math.PI * tt) * arc.current
+      spin.current = MathUtils.damp(spin.current, 0, 8, dt) // settle any tumble
+    }
+
+    // squash while airborne + idle breathe
+    const air = falling.current ? 0.12 : Math.sin(Math.PI * tt) * 0.18
     const idle = Math.sin(clock.elapsedTime * 3) * 0.02
-    p.position.y = SPRITE_H / 2 + hop + idle
-    const squash = 1 - moving * 0.1
-    p.scale.set(SPRITE_W * (1 + moving * 0.05), SPRITE_H * squash, 1)
+    p.position.y = SPRITE_H / 2 + idle
+    p.scale.set(SPRITE_W * (1 + air * 0.3), SPRITE_H * (1 - air * 0.25), 1)
+    p.rotation.z = spin.current
 
-    // yaw toward camera only, so the sprite stays upright
     g.rotation.y = Math.atan2(camera.position.x - g.position.x, camera.position.z - g.position.z)
   })
 

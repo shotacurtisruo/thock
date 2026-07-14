@@ -5,11 +5,14 @@ import { objectFor, weatherFor, type ClimbObject, type Weather } from "./config"
 export interface PressResult {
   correct: boolean
   jump: boolean // true when a space jumped us to the next word-object
+  slip: boolean // true when a miss made us slip and fall back
   worldIndex: number // absolute word index
   object: ClimbObject
   slot: number // letter slot within the word (for pitch/pan)
   flow: number
 }
+
+const SLIP_CHANCE = 0.15 // luck factor: chance a miss makes us slip & fall
 
 interface GameState {
   words: string[] // current passage, split into words
@@ -24,6 +27,8 @@ interface GameState {
   flow: number
   startTime: number | null
   weather: Weather
+  prevWeather: Weather // for the crossfade
+  weatherAt: number // timestamp the weather last changed
   keycap: "mt3" | "xda"
   character: CharacterLook
 
@@ -71,6 +76,8 @@ export const useGame = create<GameState>((set, get) => ({
   flow: 0,
   startTime: null,
   weather: weatherFor(0),
+  prevWeather: weatherFor(0),
+  weatherAt: 0,
   keycap: "mt3",
   character: loadChar(),
 
@@ -86,7 +93,7 @@ export const useGame = create<GameState>((set, get) => ({
     }),
 
   reset: () =>
-    set({ ...fresh(), errors: 0, keystrokes: 0, streak: 0, flow: 0, startTime: null, weather: weatherFor(0) }),
+    set({ ...fresh(), errors: 0, keystrokes: 0, streak: 0, flow: 0, startTime: null, weather: weatherFor(0), prevWeather: weatherFor(0), weatherAt: 0 }),
 
   press: (char) => {
     const s = get()
@@ -98,10 +105,28 @@ export const useGame = create<GameState>((set, get) => ({
     const keystrokes = s.keystrokes + 1
     const W = s.baseWord + s.wi
 
-    // wrong key: no advance, drop flow, dud
+    // wrong key: no advance, drop flow, dud — and (rarely) slip & fall back
     if (char !== expected) {
-      set({ errors: s.errors + 1, keystrokes, streak: 0, flow: Math.max(0, s.flow - FLOW_LOSS), startTime })
-      return { correct: false, jump: false, worldIndex: W, object: objectFor(W), slot: s.ci, flow: get().flow }
+      const base = { errors: s.errors + 1, keystrokes, streak: 0, flow: Math.max(0, s.flow - FLOW_LOSS), startTime }
+      // luck factor: only slip if there's somewhere to fall to
+      if (s.wi >= 1 && Math.random() < SLIP_CHANCE) {
+        const fall = Math.min(s.wi, Math.random() < 0.5 ? 2 : 1)
+        const wi = s.wi - fall
+        const nextW = s.baseWord + wi
+        const changed = weatherFor(nextW).name !== s.weather.name
+        set({
+          ...base,
+          wi,
+          ci: 0,
+          typed: cursorIndex(s.words, wi, 0),
+          weather: weatherFor(nextW),
+          prevWeather: changed ? s.weather : s.prevWeather,
+          weatherAt: changed ? Date.now() : s.weatherAt,
+        })
+        return { correct: false, jump: false, slip: true, worldIndex: nextW, object: objectFor(nextW), slot: 0, flow: base.flow }
+      }
+      set(base)
+      return { correct: false, jump: false, slip: false, worldIndex: W, object: objectFor(W), slot: s.ci, flow: base.flow }
     }
 
     const flow = Math.min(1, s.flow + FLOW_GAIN)
@@ -111,7 +136,7 @@ export const useGame = create<GameState>((set, get) => ({
     if (s.ci < word.length) {
       const ci = s.ci + 1
       set({ ci, typed: cursorIndex(s.words, s.wi, ci), keystrokes, streak, flow, startTime })
-      return { correct: true, jump: false, worldIndex: W, object: objectFor(W), slot: s.ci, flow }
+      return { correct: true, jump: false, slip: false, worldIndex: W, object: objectFor(W), slot: s.ci, flow }
     }
 
     // space -> jump to the next word-object
@@ -127,13 +152,16 @@ export const useGame = create<GameState>((set, get) => ({
     }
     const nextW = baseWord + wi
     const nextWeather = weatherFor(nextW)
-    const weather = nextWeather.name !== s.weather.name ? nextWeather : s.weather
+    const changed = nextWeather.name !== s.weather.name
     set({
       words, passage, wi, ci: 0, baseWord,
       typed: cursorIndex(words, wi, 0),
-      keystrokes, streak, flow, startTime, weather,
+      keystrokes, streak, flow, startTime,
+      weather: nextWeather,
+      prevWeather: changed ? s.weather : s.prevWeather,
+      weatherAt: changed ? Date.now() : s.weatherAt,
     })
-    return { correct: true, jump: true, worldIndex: nextW, object: objectFor(nextW), slot: 0, flow }
+    return { correct: true, jump: true, slip: false, worldIndex: nextW, object: objectFor(nextW), slot: 0, flow }
   },
 }))
 

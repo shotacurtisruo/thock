@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Scene from "./three/Scene"
 import Gallery from "./three/Gallery"
 import KeycapGallery from "./three/KeycapGallery"
@@ -8,12 +8,29 @@ import Hud from "./ui/Hud"
 import Customizer from "./ui/Customizer"
 import { useGame } from "./game/store"
 import { audio } from "./audio/AudioEngine"
-import { panForWord } from "./game/config"
+import { panForWord, hexLerp } from "./game/config"
 
 export default function App() {
   const [started, setStarted] = useState(false)
   const [customizing, setCustomizing] = useState(false)
   const weather = useGame((s) => s.weather)
+  const sceneRef = useRef<HTMLDivElement>(null)
+
+  // Smoothly crossfade the sky gradient toward the current weather.
+  useEffect(() => {
+    let raf = 0
+    const cur: [string, string, string] = [...useGame.getState().weather.sky]
+    const tick = () => {
+      const target = useGame.getState().weather.sky
+      for (let i = 0; i < 3; i++) cur[i] = hexLerp(cur[i], target[i], 0.05)
+      if (sceneRef.current) {
+        sceneRef.current.style.backgroundImage = `linear-gradient(180deg, ${cur[0]} 0%, ${cur[1]} 45%, ${cur[2]} 100%)`
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
   // Showcases: /?gallery (all objects) · /?keycaps (keycap profiles)
   const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams()
@@ -59,6 +76,8 @@ export default function App() {
         } else {
           audio.playKey(pitch, pan, res.object.sound, res.object.impact, res.flow)
         }
+      } else if (res.slip) {
+        audio.playSlip(pan)
       } else {
         audio.playDud(pan)
       }
@@ -76,9 +95,8 @@ export default function App() {
     <div className="app">
       <div
         className="scene"
-        style={{
-          backgroundImage: `linear-gradient(180deg, ${weather.sky[0]} 0%, ${weather.sky[1]} 45%, ${weather.sky[2]} 100%)`,
-        }}
+        ref={sceneRef}
+        style={{ backgroundImage: `linear-gradient(180deg, ${weather.sky[0]} 0%, ${weather.sky[1]} 45%, ${weather.sky[2]} 100%)` }}
       >
         <Scene />
         <div className="brand">thock</div>

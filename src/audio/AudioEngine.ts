@@ -182,6 +182,29 @@ class AudioEngine {
     src.stop(t + 0.12)
   }
 
+  /** A slip & fall: a descending comedic "whoop". */
+  playSlip(pan = 0) {
+    const ctx = this.ctx
+    if (!ctx) return
+    const t = ctx.currentTime
+    const out = this.pan(pan, true)
+    const osc = ctx.createOscillator()
+    osc.type = "sawtooth"
+    osc.frequency.setValueAtTime(380, t)
+    osc.frequency.exponentialRampToValueAtTime(85, t + 0.45)
+    const lp = ctx.createBiquadFilter()
+    lp.type = "lowpass"
+    lp.frequency.setValueAtTime(1400, t)
+    lp.frequency.exponentialRampToValueAtTime(300, t + 0.45)
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.02)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5)
+    osc.connect(lp).connect(g).connect(out)
+    osc.start(t)
+    osc.stop(t + 0.52)
+  }
+
   // --- internals ---
 
   /** The footstep/switch layer under each landing — character varies per object. */

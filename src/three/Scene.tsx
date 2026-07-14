@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from "@react-three/fiber"
 import { useRef } from "react"
-import { Vector3 } from "three"
+import { Vector3, Color, type Fog, type DirectionalLight } from "three"
 import { useGame } from "../game/store"
 import { objectFor, slotWorldPos, wordCenter } from "../game/config"
 import Tower from "./Tower"
@@ -41,13 +41,27 @@ function ClimbCamera() {
 }
 
 function Lighting() {
-  const tint = useGame((s) => s.weather.tint)
-  const fog = useGame((s) => s.weather.fog)
+  const fogRef = useRef<Fog>(null)
+  const dirRef = useRef<DirectionalLight>(null)
+  const fogCol = useRef(new Color("#dbecfb"))
+  const tintCol = useRef(new Color("#fff0c4"))
+  const target = useRef(new Color())
+
+  // ease fog + key-light tint toward the current weather (smooth crossfade)
+  useFrame((_, dt) => {
+    const w = useGame.getState().weather
+    const k = Math.min(1, dt * 1.1)
+    fogCol.current.lerp(target.current.set(w.fog), k)
+    tintCol.current.lerp(target.current.set(w.tint), k)
+    if (fogRef.current) fogRef.current.color.copy(fogCol.current)
+    if (dirRef.current) dirRef.current.color.copy(tintCol.current)
+  })
+
   return (
     <>
-      <fog attach="fog" args={[fog, 14, 44]} />
+      <fog ref={fogRef} attach="fog" args={["#dbecfb", 14, 44]} />
       <ambientLight intensity={0.85} />
-      <directionalLight position={[6, 12, 4]} intensity={1.2} color={tint} castShadow />
+      <directionalLight ref={dirRef} position={[6, 12, 4]} intensity={1.2} castShadow />
       {/* soft colored rim lights keep the glossy ASMR specular pop */}
       <pointLight position={[-6, 3, -4]} intensity={26} color="#ffb0da" distance={30} />
       <pointLight position={[6, -2, 5]} intensity={24} color="#9fe6ff" distance={30} />

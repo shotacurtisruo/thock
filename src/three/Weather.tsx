@@ -34,6 +34,9 @@ function Particles({ type }: { type: Particle }) {
     return g
   }, [positions])
 
+  const mat = useRef<THREE.PointsMaterial>(null)
+  const fade = useRef(0)
+
   useFrame((state, dt) => {
     const camY = state.camera.position.y
     const t = state.clock.elapsedTime
@@ -48,15 +51,19 @@ function Particles({ type }: { type: Particle }) {
       arr[i * 3] += Math.sin(t * 1.1 + phases[i]) * cfg.sway * dt
     }
     geom.attributes.position.needsUpdate = true
+    // fade in over ~1.6s so weather builds up instead of snapping on
+    fade.current = Math.min(1, fade.current + dt / 1.6)
+    if (mat.current) mat.current.opacity = cfg.opacity * fade.current
   })
 
   return (
     <points geometry={geom}>
       <pointsMaterial
+        ref={mat}
         color={cfg.color}
         size={cfg.size}
         transparent
-        opacity={cfg.opacity}
+        opacity={0}
         sizeAttenuation
         depthWrite={false}
         blending={cfg.additive ? THREE.AdditiveBlending : THREE.NormalBlending}
