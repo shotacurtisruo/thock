@@ -1,8 +1,9 @@
 import { Canvas, useFrame } from "@react-three/fiber"
-import { useRef } from "react"
+import { Suspense, useRef } from "react"
 import { Vector3, Color, type Fog, type DirectionalLight } from "three"
 import { useGame } from "../game/store"
 import { objectFor, slotWorldPos, wordCenter } from "../game/config"
+import { charWorldPos, shakeBus } from "./sceneBus"
 import Tower from "./Tower"
 import Character from "./Character"
 import Weather from "./Weather"
@@ -14,7 +15,7 @@ function ClimbCamera() {
   const camPos = useRef(new Vector3(9, 4, 9))
   const look = useRef(new Vector3())
 
-  useFrame(({ camera }, dt) => {
+  useFrame(({ camera, clock }, dt) => {
     const { baseWord, wi, ci, words } = useGame.getState()
     const W = baseWord + wi
     const len = words[wi]?.length ?? 1
@@ -22,9 +23,21 @@ function ClimbCamera() {
     // frame the word's center (stable while the blob runs across); nudge toward the blob
     const [cx, cy, cz] = wordCenter(W)
     const [bx, , bz] = slotWorldPos(W, Math.min(ci, len - 1), len)
-    const fx = cx * 0.7 + bx * 0.3
-    const fz = cz * 0.7 + bz * 0.3
-    const top = cy + objectFor(W).halfHeight
+    let fx = cx * 0.7 + bx * 0.3
+    let fz = cz * 0.7 + bz * 0.3
+    let top = cy + objectFor(W).halfHeight
+    let speed = 2.2
+
+    // mid-fall/flight: the character is far from its word anchor — track the character
+    const dx = charWorldPos.x - fx
+    const dy = charWorldPos.y - top
+    const dz2 = charWorldPos.z - fz
+    if (Math.hypot(dx, dy, dz2) > 1.5) {
+      fx = fx * 0.4 + charWorldPos.x * 0.6
+      fz = fz * 0.4 + charWorldPos.z * 0.6
+      top = top * 0.4 + charWorldPos.y * 0.6
+      speed = 4.5
+    }
 
     const clen = Math.hypot(cx, cz) || 1
     const ox = cx / clen
@@ -32,7 +45,15 @@ function ClimbCamera() {
     const dist = 8 + len * 0.45 // pull back for longer words
 
     camPos.current.set(fx + ox * dist, top + CAM_LIFT, fz + oz * dist)
-    camera.position.lerp(camPos.current, Math.min(1, dt * 2.2))
+    camera.position.lerp(camPos.current, Math.min(1, dt * speed))
+
+    // decaying landing shake
+    shakeBus.v *= Math.exp(-5 * dt)
+    if (shakeBus.v > 0.005) {
+      const tt = clock.elapsedTime
+      camera.position.x += Math.sin(tt * 91) * shakeBus.v * 0.12
+      camera.position.y += Math.sin(tt * 73 + 1.7) * shakeBus.v * 0.1
+    }
 
     look.current.set(fx, top + 0.2, fz)
     camera.lookAt(look.current)
@@ -80,7 +101,9 @@ export default function Scene() {
       <Lighting />
       <Weather />
       <Tower />
-      <Character />
+      <Suspense fallback={null}>
+        <Character />
+      </Suspense>
       <ClimbCamera />
     </Canvas>
   )

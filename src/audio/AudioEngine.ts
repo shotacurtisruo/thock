@@ -189,6 +189,26 @@ class AudioEngine {
     src.stop(t + 0.12)
   }
 
+  /** Landing after a fall: a weighty body thud. */
+  playThud(pan = 0) {
+    const ctx = this.ctx
+    if (!ctx) return
+    const t = ctx.currentTime
+    const out = this.pan(pan, true)
+    this.noiseBurst(out, t, { type: "lowpass", freq: 320, gain: 0.24, decay: 0.11 })
+    const osc = ctx.createOscillator()
+    osc.type = "sine"
+    osc.frequency.setValueAtTime(110, t)
+    osc.frequency.exponentialRampToValueAtTime(58, t + 0.13)
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(0.26, t + 0.008)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.17)
+    osc.connect(g).connect(out)
+    osc.start(t)
+    osc.stop(t + 0.19)
+  }
+
   /** A slip & fall: a descending comedic "whoop". */
   playSlip(pan = 0) {
     const ctx = this.ctx

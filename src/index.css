@@ -192,12 +192,12 @@ body {
 .cz-close:hover { color: var(--ink); }
 .cz-body { display: flex; gap: 18px; margin-top: 16px; }
 .cz-preview {
-  width: 96px;
-  height: 144px;
-  image-rendering: pixelated;
+  width: 120px;
+  height: 150px;
   background: rgba(255,255,255,0.05);
   border-radius: 12px;
   flex-shrink: 0;
+  overflow: hidden;
 }
 .cz-rows { display: flex; flex-direction: column; gap: 14px; flex: 1; justify-content: center; }
 .cz-row { display: flex; flex-direction: column; gap: 6px; }

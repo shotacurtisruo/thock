@@ -12,7 +12,9 @@ export interface PressResult {
   flow: number
 }
 
-const SLIP_CHANCE = 0.15 // luck factor: chance a miss makes us slip & fall
+// luck factor: chance a miss makes us slip & fall (?clumsy forces every miss, for testing)
+const SLIP_CHANCE =
+  typeof window !== "undefined" && new URLSearchParams(window.location.search).has("clumsy") ? 1 : 0.15
 
 interface GameState {
   words: string[] // current passage, split into words
@@ -31,6 +33,8 @@ interface GameState {
   weatherAt: number // timestamp the weather last changed
   keycap: "mt3" | "xda"
   character: CharacterLook
+  slipNonce: number // increments on every slip — visuals sequence the fall off this
+  slipAt: number // timestamp of the last slip
 
   reset: () => void
   press: (char: string) => PressResult | null
@@ -39,16 +43,15 @@ interface GameState {
 }
 
 export interface CharacterLook {
-  skin: string
-  hair: string
-  shirt: string
+  fur: string
+  accent: string
 }
 
-const DEFAULT_CHAR: CharacterLook = { skin: "#f2c79a", hair: "#3a2a20", shirt: "#4fb0e0" }
+const DEFAULT_CHAR: CharacterLook = { fur: "#e0561e", accent: "#5ff0d0" }
 
 function loadChar(): CharacterLook {
   try {
-    const raw = localStorage.getItem("thock-char")
+    const raw = localStorage.getItem("thock-char-v2")
     if (raw) return { ...DEFAULT_CHAR, ...JSON.parse(raw) }
   } catch {}
   return DEFAULT_CHAR
@@ -80,6 +83,8 @@ export const useGame = create<GameState>((set, get) => ({
   weatherAt: 0,
   keycap: "mt3",
   character: loadChar(),
+  slipNonce: 0,
+  slipAt: 0,
 
   toggleKeycap: () => set((s) => ({ keycap: s.keycap === "mt3" ? "xda" : "mt3" })),
 
@@ -87,7 +92,7 @@ export const useGame = create<GameState>((set, get) => ({
     set((s) => {
       const character = { ...s.character, [part]: value }
       try {
-        localStorage.setItem("thock-char", JSON.stringify(character))
+        localStorage.setItem("thock-char-v2", JSON.stringify(character))
       } catch {}
       return { character }
     }),
@@ -122,6 +127,8 @@ export const useGame = create<GameState>((set, get) => ({
           weather: weatherFor(nextW),
           prevWeather: changed ? s.weather : s.prevWeather,
           weatherAt: changed ? Date.now() : s.weatherAt,
+          slipNonce: s.slipNonce + 1,
+          slipAt: Date.now(),
         })
         return { correct: false, jump: false, slip: true, worldIndex: nextW, object: objectFor(nextW), slot: 0, flow: base.flow }
       }
