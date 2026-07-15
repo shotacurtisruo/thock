@@ -9,6 +9,7 @@ export default function Tower() {
   const baseWord = useGame((s) => s.baseWord)
   const curWi = useGame((s) => s.wi)
   const ci = useGame((s) => s.ci)
+  const seed = useGame((s) => s.seed)
 
   return (
     <group>
@@ -18,7 +19,7 @@ export default function Tower() {
         return (
           <group key={W} position={[x, y, z]} rotation={[0, wordRotationY(W), 0]}>
             <WordObject
-              object={objectFor(W)}
+              object={objectFor(W + seed)}
               word={word}
               variant="long"
               marks={marks[wi]}

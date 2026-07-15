@@ -18,18 +18,46 @@ export interface PressResult {
 const RED_LIMIT =
   typeof window !== "undefined" && new URLSearchParams(window.location.search).has("clumsy") ? 1 : 3
 
+export type GameMode = "zen" | 15 | 30
+export type Phase = "idle" | "running" | "done"
+
+export interface RunResults {
+  mode: GameMode
+  wpm: number
+  raw: number
+  acc: number
+  correct: number
+  errors: number
+  height: number
+  bestStreak: number
+}
+
+function loadMode(): GameMode {
+  try {
+    const raw = localStorage.getItem("thock-mode")
+    if (raw === "15") return 15
+    if (raw === "30") return 30
+  } catch {}
+  return "zen"
+}
+
 interface GameState {
   words: string[] // current passage, split into words
   marks: Mark[][] // per word, per letter
   wi: number // current word index within the passage
   ci: number // caret index within the current word
   baseWord: number // words completed in earlier passages (endless)
+  seed: number // world offset — randomizes materials/weather per run
   freshReds: number // errors since the last fall (fall at RED_LIMIT)
   errors: number
   keystrokes: number
   streak: number
+  bestStreak: number
   flow: number
   startTime: number | null
+  mode: GameMode
+  phase: Phase
+  results: RunResults | null
   weather: Weather
   prevWeather: Weather
   weatherAt: number
@@ -41,6 +69,8 @@ interface GameState {
   reset: () => void
   press: (char: string) => PressResult | null
   backspace: () => PressResult | null
+  endRun: () => void
+  setMode: (m: GameMode) => void
   toggleKeycap: () => void
   setChar: (part: keyof CharacterLook, value: string) => void
 }
@@ -63,6 +93,8 @@ function loadChar(): CharacterLook {
 const FLOW_GAIN = 0.045
 const FLOW_LOSS = 0.25
 
+const newSeed = () => Math.floor(Math.random() * 997)
+
 function fresh() {
   const passage = generatePassage()
   const words = passage.split(" ")
@@ -75,16 +107,23 @@ function fresh() {
   }
 }
 
+const seed0 = newSeed()
+
 export const useGame = create<GameState>((set, get) => ({
   ...fresh(),
+  seed: seed0,
   freshReds: 0,
   errors: 0,
   keystrokes: 0,
   streak: 0,
+  bestStreak: 0,
   flow: 0,
   startTime: null,
-  weather: weatherFor(0),
-  prevWeather: weatherFor(0),
+  mode: loadMode(),
+  phase: "idle",
+  results: null,
+  weather: weatherFor(seed0),
+  prevWeather: weatherFor(seed0),
   weatherAt: 0,
   keycap: "mt3",
   character: loadChar(),
@@ -102,31 +141,69 @@ export const useGame = create<GameState>((set, get) => ({
       return { character }
     }),
 
-  reset: () =>
+  setMode: (m) => {
+    try {
+      localStorage.setItem("thock-mode", String(m))
+    } catch {}
+    set({ mode: m })
+    get().reset()
+  },
+
+  reset: () => {
+    const seed = newSeed() // a fresh random world every run
     set({
       ...fresh(),
+      seed,
       freshReds: 0,
       errors: 0,
       keystrokes: 0,
       streak: 0,
+      bestStreak: 0,
       flow: 0,
       startTime: null,
-      weather: weatherFor(0),
-      prevWeather: weatherFor(0),
+      phase: "idle",
+      results: null,
+      weather: weatherFor(seed),
+      prevWeather: weatherFor(seed),
       weatherAt: 0,
-    }),
+    })
+  },
 
-  /** A slip: tumble back 1-2 words; fallen words must be retyped. */
+  /** Timed run over: freeze input and snapshot MonkeyType-style results. */
+  endRun: () => {
+    const s = get()
+    if (s.phase !== "running") return
+    const minutes = s.startTime ? Math.max((Date.now() - s.startTime) / 60000, 1e-6) : 1e-6
+    const correct = Math.max(0, s.keystrokes - s.errors)
+    set({
+      phase: "done",
+      results: {
+        mode: s.mode,
+        wpm: Math.round(correct / 5 / minutes),
+        raw: Math.round(s.keystrokes / 5 / minutes),
+        acc: s.keystrokes ? Math.round((correct / s.keystrokes) * 100) : 100,
+        correct,
+        errors: s.errors,
+        height: heightMeters(s),
+        bestStreak: s.bestStreak,
+      },
+    })
+  },
+
   press: (char) => {
     const s = get()
+    if (s.phase === "done") return null
     const word = s.words[s.wi]
     if (word === undefined) return null
     const startTime = s.startTime ?? Date.now()
+    const phase: Phase = "running"
     const W = s.baseWord + s.wi
+    const oF = (i: number) => objectFor(i + s.seed)
 
     // ---- space: complete/skip the word, jump to the next platform ----
     if (char === " ") {
-      if (s.ci === 0) return { kind: "none", slip: false, worldIndex: W, object: objectFor(W), slot: s.ci, flow: s.flow }
+      if (s.ci === 0)
+        return { kind: "none", slip: false, worldIndex: W, object: oF(W), slot: s.ci, flow: s.flow }
 
       // remainder of the word is skipped -> marked red (counts once toward falls)
       const marks = s.marks.map((m) => [...m])
@@ -157,8 +234,9 @@ export const useGame = create<GameState>((set, get) => ({
         wi = 0
       }
       const nextW = baseWord + wi
-      const nextWeather = weatherFor(nextW)
+      const nextWeather = weatherFor(nextW + s.seed)
       const changed = nextWeather.name !== s.weather.name
+      const streak = skipped ? 0 : s.streak + 1
       set({
         words,
         marks: nextMarks,
@@ -169,19 +247,21 @@ export const useGame = create<GameState>((set, get) => ({
         keystrokes,
         errors: s.errors + skipped,
         startTime,
+        phase,
         flow: skipped ? Math.max(0, s.flow - FLOW_LOSS) : Math.min(1, s.flow + FLOW_GAIN),
-        streak: skipped ? 0 : s.streak + 1,
+        streak,
+        bestStreak: Math.max(s.bestStreak, streak),
         weather: nextWeather,
         prevWeather: changed ? s.weather : s.prevWeather,
         weatherAt: changed ? Date.now() : s.weatherAt,
       })
-      return { kind: "jump", slip: false, worldIndex: nextW, object: objectFor(nextW), slot: 0, flow: get().flow }
+      return { kind: "jump", slip: false, worldIndex: nextW, object: oF(nextW), slot: 0, flow: get().flow }
     }
 
     // ---- letters: MonkeyType style — type through, wrong = red ----
     if (s.ci >= word.length) {
       // at the word's end only space (or backspace) does anything
-      return { kind: "none", slip: false, worldIndex: W, object: objectFor(W), slot: s.ci, flow: s.flow }
+      return { kind: "none", slip: false, worldIndex: W, object: oF(W), slot: s.ci, flow: s.flow }
     }
 
     const ok = char === word[s.ci]
@@ -191,15 +271,18 @@ export const useGame = create<GameState>((set, get) => ({
     const keystrokes = s.keystrokes + 1
 
     if (ok) {
+      const streak = s.streak + 1
       set({
         marks,
         ci,
         keystrokes,
         startTime,
-        streak: s.streak + 1,
+        phase,
+        streak,
+        bestStreak: Math.max(s.bestStreak, streak),
         flow: Math.min(1, s.flow + FLOW_GAIN),
       })
-      return { kind: "correct", slip: false, worldIndex: W, object: objectFor(W), slot: s.ci, flow: get().flow }
+      return { kind: "correct", slip: false, worldIndex: W, object: oF(W), slot: s.ci, flow: get().flow }
     }
 
     const freshReds = s.freshReds + 1
@@ -211,17 +294,19 @@ export const useGame = create<GameState>((set, get) => ({
       ci,
       keystrokes,
       startTime,
+      phase,
       freshReds,
       errors: s.errors + 1,
       streak: 0,
       flow: Math.max(0, s.flow - FLOW_LOSS),
     })
-    return { kind: "error", slip: false, worldIndex: W, object: objectFor(W), slot: s.ci, flow: get().flow }
+    return { kind: "error", slip: false, worldIndex: W, object: oF(W), slot: s.ci, flow: get().flow }
   },
 
   /** Backspace: step back within the current word; deleting a red un-counts it. */
   backspace: () => {
     const s = get()
+    if (s.phase === "done") return null
     if (s.ci === 0) return null
     const ci = s.ci - 1
     const marks = s.marks.map((m) => [...m])
@@ -233,7 +318,7 @@ export const useGame = create<GameState>((set, get) => ({
       freshReds: wasRed ? Math.max(0, s.freshReds - 1) : s.freshReds,
     })
     const W = s.baseWord + s.wi
-    return { kind: "backspace", slip: false, worldIndex: W, object: objectFor(W), slot: ci, flow: s.flow }
+    return { kind: "backspace", slip: false, worldIndex: W, object: objectFor(W + s.seed), slot: ci, flow: s.flow }
   },
 }))
 
@@ -248,7 +333,7 @@ function doFall(
   const marks = extra.marks
   for (let i = wi; i <= s.wi; i++) marks[i] = Array<Mark>(s.words[i].length).fill(0)
   const nextW = s.baseWord + wi
-  const nextWeather = weatherFor(nextW)
+  const nextWeather = weatherFor(nextW + s.seed)
   const changed = nextWeather.name !== s.weather.name
   set({
     marks,
@@ -258,6 +343,7 @@ function doFall(
     keystrokes: extra.keystrokes,
     errors: extra.errors,
     startTime: extra.startTime,
+    phase: "running",
     streak: 0,
     flow: Math.max(0, s.flow - FLOW_LOSS),
     weather: nextWeather,
@@ -266,7 +352,14 @@ function doFall(
     slipNonce: s.slipNonce + 1,
     slipAt: Date.now(),
   })
-  return { kind: "error", slip: true, worldIndex: nextW, object: objectFor(nextW), slot: 0, flow: Math.max(0, s.flow - FLOW_LOSS) }
+  return {
+    kind: "error",
+    slip: true,
+    worldIndex: nextW,
+    object: objectFor(nextW + s.seed),
+    slot: 0,
+    flow: Math.max(0, s.flow - FLOW_LOSS),
+  }
 }
 
 // --- Derived selectors ---

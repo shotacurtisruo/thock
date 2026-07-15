@@ -6,6 +6,7 @@ import DesignLab from "./three/DesignLab"
 import TypingBar from "./ui/TypingBar"
 import Hud from "./ui/Hud"
 import Customizer from "./ui/Customizer"
+import Results from "./ui/Results"
 import { useGame } from "./game/store"
 import { audio } from "./audio/AudioEngine"
 import { panForWord, hexLerp } from "./game/config"
@@ -42,6 +43,23 @@ export default function App() {
   useEffect(() => {
     audio.setAmbience(weather.name)
   }, [weather.name])
+
+  // Timed modes: end the run when the clock hits zero.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const st = useGame.getState()
+      if (
+        st.phase === "running" &&
+        st.mode !== "zen" &&
+        st.startTime &&
+        Date.now() - st.startTime >= (st.mode as number) * 1000
+      ) {
+        st.endRun()
+      }
+    }, 150)
+    return () => clearInterval(id)
+  }, [])
+  const phase = useGame((s) => s.phase)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -118,6 +136,7 @@ export default function App() {
         <Hud />
         <TypingBar />
       </div>
+      {phase === "done" && <Results />}
     </div>
   )
 }

@@ -209,95 +209,125 @@ function LongMesh({ object: o, n }: { object: ClimbObject; n: number }) {
   const L = Math.max(n, 1) * GAP
   const slots = Array.from({ length: Math.max(n, 1) }, (_, i) => (i - (n - 1) / 2) * GAP)
   switch (o.shape) {
-    case "keycap": // a long spacebar on a base plate with RGB underglow
+    case "keycap": // a keyboard: base plate + RGB underglow + chunky caps with per-letter seams
       return (
         <group>
-          <RoundedBox args={[L + 0.4, 0.24, 1.5]} radius={0.1} smoothness={4} position={[0, -0.38, 0]}>
+          <RoundedBox args={[L + 0.4, 0.24, 1.62]} radius={0.1} smoothness={4} position={[0, -0.38, 0]}>
             <meshPhysicalMaterial color="#1c2029" roughness={0.5} clearcoat={0.3} />
           </RoundedBox>
           <mesh position={[0, -0.55, 0]}>
-            <boxGeometry args={[L + 0.55, 0.1, 1.65]} />
+            <boxGeometry args={[L + 0.55, 0.1, 1.8]} />
             <meshBasicMaterial color="#7ad0ff" toneMapped={false} />
           </mesh>
-          <RoundedBox args={[L, 0.3, 1.16]} radius={0.05} smoothness={4} position={[0, -0.11, 0]}>
+          <RoundedBox args={[L, 0.3, 1.34]} radius={0.05} smoothness={4} position={[0, -0.11, 0]}>
             <LMat o={o} color="#3c4450" />
           </RoundedBox>
-          <RoundedBox args={[L - 0.18, 0.3, 0.98]} radius={0.08} smoothness={4} position={[0, 0.12, 0]}>
+          <RoundedBox args={[L - 0.14, 0.3, 1.14]} radius={0.08} smoothness={4} position={[0, 0.12, 0]}>
             <LMat o={o} color="#454e5c" />
           </RoundedBox>
+          {/* seams between the letters — reads as individual keys again */}
+          {slots.slice(1).map((x, i) => (
+            <mesh key={i} position={[x - GAP / 2, 0.14, 0]}>
+              <boxGeometry args={[0.045, 0.28, 1.16]} />
+              <meshStandardMaterial color="#20242c" roughness={0.6} />
+            </mesh>
+          ))}
         </group>
       )
     case "chocolate": // rimmed slab + tight beveled squares per letter
       return (
         <group>
-          <RoundedBox args={[L + 0.06, 0.18, 1.12]} radius={0.04} smoothness={3} position={[0, -0.13, 0]}>
+          <RoundedBox args={[L + 0.06, 0.18, 1.3]} radius={0.04} smoothness={3} position={[0, -0.13, 0]}>
             <LMat o={o} color="#472a10" />
           </RoundedBox>
           {slots.map((x, i) =>
-            [-0.25, 0.25].map((z, j) => (
-              <RoundedBox key={`${i}-${j}`} args={[GAP * 0.72, 0.2, 0.44]} radius={0.05} smoothness={3} position={[x, 0.11, z]}>
+            [-0.3, 0.3].map((z, j) => (
+              <RoundedBox key={`${i}-${j}`} args={[GAP * 0.74, 0.2, 0.52]} radius={0.05} smoothness={3} position={[x, 0.11, z]}>
                 <LMat o={o} />
               </RoundedBox>
             ))
           )}
         </group>
       )
-    case "jelly": // slumped gelatin loaf with trapped micro-bubbles
+    case "jelly": // slumped gelatin loaf, scalloped per letter, trapped micro-bubbles
       return (
         <group>
-          <RoundedBox args={[L + 0.08, 0.36, 1.08]} radius={0.16} smoothness={4} position={[0, -0.28, 0]}>
+          <RoundedBox args={[L + 0.1, 0.36, 1.32]} radius={0.16} smoothness={4} position={[0, -0.28, 0]}>
             <LMat o={o} />
           </RoundedBox>
-          <RoundedBox args={[L - 0.04, 0.88, 0.96]} radius={0.2} smoothness={5} position={[0, 0.02, 0]}>
+          <RoundedBox args={[L - 0.02, 0.84, 1.16]} radius={0.22} smoothness={5} position={[0, -0.02, 0]}>
             <LMat o={o} />
           </RoundedBox>
+          {/* per-letter wobble domes — the gummy scallop */}
           {slots.map((x, i) => (
-            <AirBubble key={i} pos={[x + (i % 2 ? 0.15 : -0.12), 0.08 + (i % 3) * 0.1, i % 2 ? -0.08 : 0.12]} r={0.04} />
+            <mesh key={`d${i}`} position={[x, 0.28, 0]} scale={[0.95, 0.36, 1.1]}>
+              <sphereGeometry args={[0.5, 20, 14]} />
+              <LMat o={o} />
+            </mesh>
+          ))}
+          {slots.map((x, i) => (
+            <AirBubble key={i} pos={[x + (i % 2 ? 0.15 : -0.12), 0.08 + (i % 3) * 0.1, i % 2 ? -0.1 : 0.14]} r={0.04} />
           ))}
         </group>
       )
-    case "butter": // pale stick with a deeper-yellow cut face
+    case "butter": // fat pale stick with a deeper-yellow cut face
       return (
         <group>
-          <RoundedBox args={[L - 0.14, 0.5, 0.72]} radius={0.05} smoothness={3} position={[-0.07, 0, 0]}>
+          <RoundedBox args={[L - 0.14, 0.5, 0.98]} radius={0.06} smoothness={3} position={[-0.07, 0, 0]}>
             <LMat o={o} />
           </RoundedBox>
-          <RoundedBox args={[0.14, 0.46, 0.68]} radius={0.04} smoothness={3} position={[L / 2 - 0.06, 0, 0]}>
+          <RoundedBox args={[0.14, 0.46, 0.92]} radius={0.04} smoothness={3} position={[L / 2 - 0.06, 0, 0]}>
             <LMat o={o} color="#e9bd41" />
           </RoundedBox>
         </group>
       )
-    case "marshmallow": // long puffy capsule
+    case "marshmallow": // puffy rope with per-letter pinches
       return (
-        <mesh rotation={[0, 0, Math.PI / 2]} scale={[1, 1, 1]}>
-          <capsuleGeometry args={[0.48, Math.max(0.2, L - 0.96), 8, 24]} />
-          <LMat o={o} />
-        </mesh>
+        <group>
+          <mesh rotation={[0, 0, Math.PI / 2]}>
+            <capsuleGeometry args={[0.5, Math.max(0.2, L - 1.0), 8, 24]} />
+            <LMat o={o} />
+          </mesh>
+          {slots.slice(1).map((x, i) => (
+            <mesh key={i} position={[x - GAP / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+              <torusGeometry args={[0.42, 0.1, 10, 22]} />
+              <LMat o={o} color="#f2e0d4" />
+            </mesh>
+          ))}
+        </group>
       )
-    case "bubble": // stretched soap film, iridescent + see-through
+    case "bubble": { // a chain of soap bubbles, one per letter
+      const bubbleMat = (
+        <meshPhysicalMaterial
+          color="#dcefff"
+          transparent
+          opacity={0.24}
+          depthWrite={false}
+          roughness={0}
+          metalness={0}
+          ior={1.33}
+          iridescence={1}
+          iridescenceIOR={1.33}
+          iridescenceThicknessRange={[120, 480]}
+          clearcoat={1}
+          clearcoatRoughness={0}
+        />
+      )
       return (
-        <mesh scale={[L / 0.92, 1, 1]}>
-          <sphereGeometry args={[0.46, 40, 28]} />
-          <meshPhysicalMaterial
-            color="#dcefff"
-            transparent
-            opacity={0.24}
-            depthWrite={false}
-            roughness={0}
-            metalness={0}
-            ior={1.33}
-            iridescence={1}
-            iridescenceIOR={1.33}
-            iridescenceThicknessRange={[120, 480]}
-            clearcoat={1}
-            clearcoatRoughness={0}
-          />
-        </mesh>
+        <group>
+          {slots.map((x, i) => (
+            <mesh key={i} position={[x, 0, 0]} scale={[1.15, 0.92, 1.15]}>
+              <sphereGeometry args={[0.5, 32, 22]} />
+              {bubbleMat}
+            </mesh>
+          ))}
+        </group>
       )
+    }
     case "ice": // glassy block with a cloudy frozen core + hairline cracks
       return (
         <group>
-          <RoundedBox args={[L, 0.8, 0.9]} radius={0.08} smoothness={4}>
+          <RoundedBox args={[L, 0.84, 1.15]} radius={0.09} smoothness={4}>
             <meshPhysicalMaterial
               color="#cfeaff"
               transparent
@@ -310,7 +340,7 @@ function LongMesh({ object: o, n }: { object: ClimbObject; n: number }) {
               clearcoatRoughness={0.05}
             />
           </RoundedBox>
-          <RoundedBox args={[L * 0.5, 0.38, 0.42]} radius={0.12} smoothness={3}>
+          <RoundedBox args={[L * 0.6, 0.4, 0.55]} radius={0.12} smoothness={3}>
             <meshStandardMaterial color="#ffffff" transparent opacity={0.55} roughness={1} depthWrite={false} />
           </RoundedBox>
           <mesh rotation={[0.4, 0.5, 0.25]} position={[-L * 0.18, 0.12, 0.05]}>
@@ -329,11 +359,11 @@ function LongMesh({ object: o, n }: { object: ClimbObject; n: number }) {
           {slots.map((x, i) => (
             <group key={i} position={[x, 0, 0]} rotation={[0, Math.PI / 6, 0]}>
               <mesh>
-                <cylinderGeometry args={[0.56, 0.56, 0.56, 6]} />
+                <cylinderGeometry args={[0.6, 0.6, 0.56, 6]} />
                 <meshPhysicalMaterial color="#a86a00" roughness={0.55} clearcoat={0.4} clearcoatRoughness={0.3} />
               </mesh>
               <mesh position={[0, -0.04, 0]}>
-                <cylinderGeometry args={[0.45, 0.45, 0.44, 6]} />
+                <cylinderGeometry args={[0.48, 0.48, 0.44, 6]} />
                 <LMat o={o} />
               </mesh>
               {i === Math.floor(slots.length / 2) && (
@@ -349,7 +379,7 @@ function LongMesh({ object: o, n }: { object: ClimbObject; n: number }) {
     case "slime": // gooey stretched blob with drips + trapped bubbles
       return (
         <group>
-          <mesh scale={[L / 1.3, 0.72, 1]}>
+          <mesh scale={[L / 1.3, 0.75, 1.3]}>
             <icosahedronGeometry args={[0.58, 3]} />
             <LMat o={o} />
           </mesh>

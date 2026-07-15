@@ -226,7 +226,7 @@ export default function Character() {
     const len = words[wi]?.length ?? 1
     const s = Math.min(ci, len - 0.4) // stand at the caret; hold at the platform edge when done
     const [gx, gy, gz] = slotWorldPos(W, s, len)
-    goal.current.set(gx, gy + objectFor(W).halfHeight, gz)
+    goal.current.set(gx, gy + objectFor(W + st.seed).halfHeight, gz)
 
     if (!inited.current) {
       g.position.copy(goal.current)
