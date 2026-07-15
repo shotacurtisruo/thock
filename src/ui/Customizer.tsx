@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 import { Canvas } from "@react-three/fiber"
 import { useGame, type CharacterLook } from "../game/store"
-import { SquirrelModel } from "../three/Character"
+import { KittenModel } from "../three/Character"
 
 const FURS = ["#e0561e", "#eaa33b", "#9aa1ab", "#f2a3c0", "#8fd8b8", "#b6a3e8"]
 const ACCENTS = ["#5ff0d0", "#ff7eb0", "#7db4ff", "#ffcf5e", "#e05050", "#f5f2ff"]
@@ -43,7 +43,7 @@ export default function Customizer({ onClose }: { onClose: () => void }) {
               <pointLight position={[-3, 2, 2]} intensity={12} color="#ffb0da" distance={15} />
               <Suspense fallback={null}>
                 <group position={[0, -0.55, 0]}>
-                  <SquirrelModel fur={character.fur} accent={character.accent} spin />
+                  <KittenModel fur={character.fur} accent={character.accent} spin />
                 </group>
               </Suspense>
             </Canvas>

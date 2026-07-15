@@ -1,78 +1,159 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useMemo, useRef } from "react"
 import { useFrame } from "@react-three/fiber"
-import { useGLTF } from "@react-three/drei"
-import {
-  Box3,
-  Color,
-  MathUtils,
-  MeshStandardMaterial,
-  Vector3,
-  type Group,
-  type Mesh,
-} from "three"
+import { CatmullRomCurve3, MathUtils, Vector3, type Group } from "three"
 import { useGame } from "../game/store"
 import { objectFor, slotWorldPos, panForWord } from "../game/config"
 import { audio } from "../audio/AudioEngine"
 import { charWorldPos, shake } from "./sceneBus"
 
-const MODEL_URL = "/models/squirrel.glb"
-const HEIGHT = 1.15 // normalized standing height in world units
-
 const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10)
 
+const PINK = "#ff9ec2"
+const CREAM = "#fff6ee"
+const INK = "#1c1c28"
+
 /**
- * The squirrel model ("Squirrel" by Poly by Google, CC-BY, via poly.pizza),
- * normalized to HEIGHT with feet at y=0, tinted with the player's fur color,
- * plus an accent scarf. Shared by the game and the customizer preview.
+ * A chibi kitten built from primitives — glossy candy style, ~1.1 units tall,
+ * facing +Z. Fur + scarf colors are customizable; the tail sways on its own
+ * and swings harder while moving. Shared by the game and the customizer.
  */
-export function SquirrelModel({ fur, accent, spin = false }: { fur: string; accent: string; spin?: boolean }) {
-  const { scene } = useGLTF(MODEL_URL)
-
-  const { model, dims } = useMemo(() => {
-    const s = scene.clone(true)
-    // the asset is authored Z-up — stand it upright in our Y-up world
-    s.rotation.x = -Math.PI / 2
-    s.updateMatrixWorld(true)
-    const box = new Box3().setFromObject(s)
-    const size = box.getSize(new Vector3())
-    const scale = HEIGHT / size.y
-    s.scale.setScalar(scale)
-    s.updateMatrixWorld(true)
-    const box2 = new Box3().setFromObject(s)
-    const c = box2.getCenter(new Vector3())
-    s.position.set(-c.x, -box2.min.y, -c.z)
-    const d = box2.getSize(new Vector3())
-    return { model: s, dims: d }
-  }, [scene])
-
-  useEffect(() => {
-    model.traverse((o) => {
-      const m = o as Mesh
-      if (m.isMesh) {
-        m.material = new MeshStandardMaterial({ color: new Color(fur), roughness: 0.55, metalness: 0 })
-        m.castShadow = true
-      }
-    })
-  }, [model, fur])
-
+export function KittenModel({ fur, accent, spin = false }: { fur: string; accent: string; spin?: boolean }) {
   const g = useRef<Group>(null)
-  useFrame((_, dt) => {
+  const tail = useRef<Group>(null)
+  const prevPos = useRef(new Vector3())
+  const swing = useRef(0)
+
+  const tailCurve = useMemo(
+    () =>
+      new CatmullRomCurve3([
+        new Vector3(0, 0.22, -0.26),
+        new Vector3(0.06, 0.14, -0.48),
+        new Vector3(0.17, 0.34, -0.6),
+        new Vector3(0.13, 0.6, -0.54),
+        new Vector3(0.02, 0.72, -0.4),
+      ]),
+    []
+  )
+
+  useFrame(({ clock }, dt) => {
     if (spin && g.current) g.current.rotation.y += dt * 0.9
+    // tail: idle sway + extra swing while the character is moving
+    const speed = charWorldPos.distanceTo(prevPos.current) / Math.max(dt, 1e-3)
+    prevPos.current.copy(charWorldPos)
+    swing.current = MathUtils.damp(swing.current, Math.min(0.5, speed * 0.06), 5, dt)
+    if (tail.current) {
+      const t = clock.elapsedTime
+      tail.current.rotation.y = Math.sin(t * 1.9) * (0.16 + swing.current)
+      tail.current.rotation.x = Math.sin(t * 1.3 + 1) * 0.06 + swing.current * 0.3
+    }
   })
+
+  const furMat = <meshPhysicalMaterial color={fur} roughness={0.45} clearcoat={0.6} clearcoatRoughness={0.35} />
 
   return (
     <group ref={g}>
-      <primitive object={model} />
-      {/* accent scarf — a snug ring around the neck */}
-      <mesh position={[0, dims.y * 0.56, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[dims.z * 0.55, dims.z * 0.16, 10, 22]} />
+      {/* body (sitting) */}
+      <mesh position={[0, 0.34, 0]} scale={[1, 0.95, 0.9]}>
+        <sphereGeometry args={[0.34, 28, 22]} />
+        {furMat}
+      </mesh>
+      {/* belly patch */}
+      <mesh position={[0, 0.32, 0.17]} scale={[1, 1.15, 0.55]}>
+        <sphereGeometry args={[0.2, 20, 16]} />
+        <meshPhysicalMaterial color={CREAM} roughness={0.5} clearcoat={0.4} />
+      </mesh>
+      {/* front paws */}
+      <mesh position={[-0.13, 0.09, 0.22]}>
+        <sphereGeometry args={[0.09, 16, 12]} />
+        {furMat}
+      </mesh>
+      <mesh position={[0.13, 0.09, 0.22]}>
+        <sphereGeometry args={[0.09, 16, 12]} />
+        {furMat}
+      </mesh>
+
+      {/* scarf */}
+      <mesh position={[0, 0.6, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.185, 0.055, 10, 24]} />
         <meshStandardMaterial color={accent} roughness={0.6} />
       </mesh>
+
+      {/* head */}
+      <mesh position={[0, 0.82, 0.02]}>
+        <sphereGeometry args={[0.32, 28, 22]} />
+        {furMat}
+      </mesh>
+      {/* ears (outer + inner) */}
+      {[-1, 1].map((s) => (
+        <group key={s} position={[s * 0.18, 1.08, 0]} rotation={[0, 0, s * -0.3]}>
+          <mesh>
+            <coneGeometry args={[0.1, 0.2, 4]} />
+            {furMat}
+          </mesh>
+          <mesh position={[0, -0.01, 0.035]} scale={[0.55, 0.6, 0.55]}>
+            <coneGeometry args={[0.1, 0.2, 4]} />
+            <meshStandardMaterial color={PINK} roughness={0.6} />
+          </mesh>
+        </group>
+      ))}
+      {/* muzzle */}
+      <mesh position={[0, 0.73, 0.26]} scale={[1.15, 0.75, 0.7]}>
+        <sphereGeometry args={[0.13, 20, 16]} />
+        <meshPhysicalMaterial color={CREAM} roughness={0.5} clearcoat={0.4} />
+      </mesh>
+      {/* nose */}
+      <mesh position={[0, 0.77, 0.36]} rotation={[Math.PI, 0, 0]}>
+        <coneGeometry args={[0.03, 0.035, 3]} />
+        <meshStandardMaterial color={PINK} roughness={0.4} />
+      </mesh>
+      {/* eyes (kawaii: big dark + glint) */}
+      {[-1, 1].map((s) => (
+        <group key={s} position={[s * 0.13, 0.86, 0.27]}>
+          <mesh scale={[1, 1.35, 0.55]}>
+            <sphereGeometry args={[0.05, 16, 12]} />
+            <meshStandardMaterial color={INK} roughness={0.25} />
+          </mesh>
+          <mesh position={[0.015, 0.025, 0.03]}>
+            <sphereGeometry args={[0.017, 8, 8]} />
+            <meshBasicMaterial color="#ffffff" />
+          </mesh>
+        </group>
+      ))}
+      {/* blush */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * 0.21, 0.73, 0.23]} scale={[1, 0.7, 0.5]}>
+          <sphereGeometry args={[0.05, 12, 10]} />
+          <meshBasicMaterial color={PINK} transparent opacity={0.55} />
+        </mesh>
+      ))}
+      {/* whiskers */}
+      {[-1, 1].map((s) =>
+        [-0.05, 0, 0.05].map((tilt, i) => (
+          <mesh
+            key={`${s}-${i}`}
+            position={[s * 0.24, 0.74 + tilt, 0.27]}
+            rotation={[0, s * -0.25, s * (tilt * 3 + 0.06)]}
+          >
+            <boxGeometry args={[0.16, 0.006, 0.006]} />
+            <meshBasicMaterial color="#f5f2ff" />
+          </mesh>
+        ))
+      )}
+
+      {/* tail — curls up behind, sways springy */}
+      <group ref={tail} position={[0, 0, 0]}>
+        <mesh>
+          <tubeGeometry args={[tailCurve, 24, 0.055, 10, false]} />
+          {furMat}
+        </mesh>
+        <mesh position={[0.02, 0.72, -0.4]}>
+          <sphereGeometry args={[0.075, 14, 12]} />
+          <meshPhysicalMaterial color={CREAM} roughness={0.5} clearcoat={0.4} />
+        </mesh>
+      </group>
     </group>
   )
 }
-
-useGLTF.preload(MODEL_URL)
 
 type Mode = "move" | "stagger" | "drop" | "recover"
 
@@ -212,7 +293,7 @@ export default function Character() {
   return (
     <group ref={root}>
       <group ref={body}>
-        <SquirrelModel fur={look.fur} accent={look.accent} />
+        <KittenModel fur={look.fur} accent={look.accent} />
       </group>
     </group>
   )
