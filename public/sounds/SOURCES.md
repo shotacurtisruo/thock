@@ -52,7 +52,8 @@ Reload the page — that material now plays your sample. Commit the files + mani
 
 | file | source URL | license | author |
 |------|-----------|---------|--------|
-|      |           |         |        |
+| mt3.mp3 | https://freesound.org/people/Code_Redder/sounds/537618/ | Creative Commons 0 | Code_Redder |
+| honey.mp3 | https://freesound.org/people/bevibeldesign/sounds/315931/ | Creative Commons 0 | bevibeldesign |
 
 > Keep this table honest — even CC0 is nice to credit, and Pixabay clips should
 > stay on Pixabay's license. Don't add anything you can't point to a source for.
