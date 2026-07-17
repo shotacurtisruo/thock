@@ -50,6 +50,55 @@ function CrackLines({ cracks, level, color = "#ffffff" }: { cracks: Crack[]; lev
   )
 }
 
+/** One soft white marshmallow cylinder that SQUISHES when the cat lands on it
+ *  (compresses down + bulges wide, then springs back). Short & wide. */
+function Marshmallow({ seed, glow }: { seed: number; glow: number }) {
+  const grp = useRef<Group>(null)
+  const sq = useRef(0)
+  const was = useRef(false)
+  useFrame((_, dt) => {
+    const landed = glow > 0
+    if (landed && !was.current) sq.current = 1 // just landed → squish impulse
+    was.current = landed
+    if (sq.current > 0) sq.current = Math.max(0, sq.current - dt * 4.5) // spring back
+    const g = grp.current
+    if (g) {
+      const k = sq.current
+      g.scale.set(1 + k * 0.16, 1 - k * 0.26, 1 + k * 0.16)
+    }
+  })
+  const r = 0.45 + hash(seed * 1.3 + 0.2) * 0.06 // wide
+  const h = 0.34 + hash(seed * 3.3 + 0.7) * 0.12 // short
+  const lean = (hash(seed * 4.7) * 2 - 1) * 0.05
+  const tube = 0.09
+  const cy = 0.5 - h / 2 - tube // rounded top rim peaks at +0.5
+  const rimR = r - tube
+  const col = "#fff6ef"
+  const rimMat = (
+    <meshStandardMaterial color={col} roughness={0.98} emissive={glow > 0 ? col : "#000000"} emissiveIntensity={glow * 0.3} />
+  )
+  return (
+    <group ref={grp} rotation={[0, 0, lean]}>
+      <mesh position={[0, cy, 0]}>
+        <cylinderGeometry args={[r, r, h, 32]} />
+        <meshStandardMaterial color={col} roughness={0.98} emissive={glow > 0 ? col : "#000000"} emissiveIntensity={glow * 0.3} />
+      </mesh>
+      <mesh position={[0, cy + h / 2, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[rimR, tube, 14, 32]} />
+        {rimMat}
+      </mesh>
+      <mesh position={[0, cy + h / 2 + tube, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[rimR, 32]} />
+        <meshStandardMaterial color={col} roughness={0.98} emissive={glow > 0 ? col : "#000000"} emissiveIntensity={glow * 0.3} />
+      </mesh>
+      <mesh position={[0, cy - h / 2, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[rimR, tube, 14, 32]} />
+        <meshStandardMaterial color={col} roughness={0.98} emissive={glow > 0 ? col : "#000000"} emissiveIntensity={glow * 0.3} />
+      </mesh>
+    </group>
+  )
+}
+
 /** Mostly-matte chocolate with just a hint of temper sheen. */
 function ChocMat({ glow = 0, color = "#5f3417" }: { glow?: number; color?: string }) {
   return (
@@ -279,28 +328,9 @@ function Geometry({ object, glow, seed = 0, crack = 0 }: { object: ClimbObject; 
         </group>
       )
 
-    case "marshmallow": {
-      // campfire-toasted: soft white pillow body + golden-brown toasted crust on
-      // top (toast level + char spots randomized per cell). Matte, squishy.
-      const w = 0.84 + hash(seed * 1.3 + 0.2) * 0.24
-      const d = 0.84 + hash(seed * 2.1 + 0.5) * 0.24
-      const h = 0.7 + hash(seed * 3.3 + 0.7) * 0.24
-      const lean = (hash(seed * 4.7) * 2 - 1) * 0.05
-      const bodyCy = 0.44 - h / 2 // body top ~+0.42; the dome brings it to +0.5
-      return (
-        <group rotation={[0, 0, lean]}>
-          {/* soft white puffy body — near-max rounding so it reads pillowy */}
-          <RoundedBox args={[w, h, d]} radius={Math.min(w, h, d) * 0.49} smoothness={5} position={[0, bodyCy, 0]}>
-            <meshStandardMaterial color="#fff6ef" roughness={0.98} emissive={glow > 0 ? "#fff6ef" : "#000000"} emissiveIntensity={glow * 0.3} />
-          </RoundedBox>
-          {/* soft white domed top (walkable surface ~+0.5), same colour — seamless pillow */}
-          <mesh position={[0, 0.36, 0]} scale={[w * 0.5, 0.18, d * 0.5]}>
-            <sphereGeometry args={[1, 24, 16]} />
-            <meshStandardMaterial color="#fffaf4" roughness={0.98} emissive={glow > 0 ? "#fff6ef" : "#000000"} emissiveIntensity={glow * 0.3} />
-          </mesh>
-        </group>
-      )
-    }
+    case "marshmallow":
+      // short & wide soft white cylinder that squishes when landed on
+      return <Marshmallow seed={seed} glow={glow} />
 
     case "bubble":
       // soap film: alpha-transparent shell (blends with the sky) + thin-film iridescent sheen
