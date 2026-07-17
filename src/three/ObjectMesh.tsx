@@ -227,21 +227,44 @@ function Geometry({ object, glow, seed = 0, crack = 0 }: { object: ClimbObject; 
       )
     }
 
-    case "jelly":
-      // slumped translucent gelatin cube with trapped micro-bubbles
+    case "jelly": {
+      // wobbly translucent gummy — each cell randomized (size, tint, lean,
+      // highlight, bubble), tops aligned at +0.46 so the walk surface stays flat.
+      const w = 0.78 + hash(seed * 1.3 + 0.2) * 0.26 // 0.78–1.04
+      const d = 0.78 + hash(seed * 2.1 + 0.5) * 0.26
+      const h = 0.66 + hash(seed * 3.3 + 0.7) * 0.26 // 0.66–0.92
+      const lean = (hash(seed * 4.7) * 2 - 1) * 0.06
+      const tints = ["#ff77b3", "#ff8ec2", "#f96ba6", "#ff6f9f", "#ef7ec0"]
+      const col = tints[Math.floor(hash(seed * 5.9) * tints.length)]
+      const cy = 0.46 - h / 2 // top face at +0.46
+      const rad = Math.min(w, h, d) * 0.44
+      const hx = (hash(seed * 6.7) * 2 - 1) * 0.22
+      const hz = (hash(seed * 7.1) * 2 - 1) * 0.16
       return (
-        <group>
-          <RoundedBox args={[1.08, 0.36, 1.08]} radius={0.16} smoothness={4} position={[0, -0.28, 0]}>
-            <Mat o={o} glow={glow} />
+        <group rotation={[0, 0, lean]}>
+          <RoundedBox args={[w, h, d]} radius={rad} smoothness={5} position={[0, cy, 0]}>
+            <meshPhysicalMaterial
+              color={col}
+              transparent
+              opacity={0.86}
+              roughness={0.06}
+              metalness={0}
+              clearcoat={1}
+              clearcoatRoughness={0.05}
+              emissive={col}
+              emissiveIntensity={0.12 + glow}
+            />
           </RoundedBox>
-          <RoundedBox args={[0.96, 0.88, 0.96]} radius={0.2} smoothness={5} position={[0, 0.02, 0]}>
-            <Mat o={o} glow={glow} />
-          </RoundedBox>
-          <InnerBubble pos={[-0.18, 0.08, 0.12]} r={0.045} />
-          <InnerBubble pos={[0.16, -0.1, -0.06]} r={0.035} />
-          <InnerBubble pos={[0.04, 0.24, 0.02]} r={0.028} />
+          {/* wet glossy highlight catching the light */}
+          <mesh position={[hx, 0.42, d * 0.3 + hz]} scale={[0.15, 0.07, 0.11]}>
+            <sphereGeometry args={[1, 12, 10]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.75} />
+          </mesh>
+          {/* a trapped air bubble */}
+          <InnerBubble pos={[hx * 0.5, cy + 0.05, -hz]} r={0.03 + hash(seed * 8.3) * 0.03} />
         </group>
       )
+    }
 
     case "butter":
       // a cut stick: pale outer + deeper-yellow exposed cut face

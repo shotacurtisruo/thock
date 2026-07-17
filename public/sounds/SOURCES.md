@@ -56,6 +56,7 @@ Reload the page — that material now plays your sample. Commit the files + mani
 | sticky_peel.mp3 | https://freesound.org/people/Keegan_Miner/sounds/474580/ | Creative Commons 0 | Keegan_Miner |
 | ice_cubes.mp3 | https://freesound.org/people/baidonovan/sounds/187349/ | Creative Commons 0 | baidonovan |
 | choc_break.mp3 | https://freesound.org/people/pbeare70/sounds/851574/ | Creative Commons 0 | pbeare70 |
+| squish_impact.mp3 | https://freesound.org/people/Bertsz/sounds/500912/ | Creative Commons 0 | Bertsz |
 
 > Keep this table honest — even CC0 is nice to credit, and Pixabay clips should
 > stay on Pixabay's license. Don't add anything you can't point to a source for.
