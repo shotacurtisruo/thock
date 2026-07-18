@@ -215,6 +215,8 @@ export default function Character() {
   const lastSlip = useRef(useGame.getState().slipNonce)
   const inited = useRef(false)
   const camRight = useRef(new Vector3())
+  const sinkY = useRef(0) // how far the cat has settled into slime (springy)
+  const sinkV = useRef(0)
 
   useFrame(({ camera }, dt) => {
     const g = root.current
@@ -227,7 +229,11 @@ export default function Character() {
     const angle = st.angles[wi] ?? 0
     const s = Math.min(ci, len - 0.4) // stand at the caret; hold at the platform edge when done
     const [gx, gy, gz] = slotWorldPos(angle, W, s, len)
-    goal.current.set(gx, gy + objectFor(W + st.seed).halfHeight, gz)
+    const obj = objectFor(W + st.seed)
+    const onSlime = obj.shape === "slime"
+    // how far a soft surface gives under the cat (matches the bar's own dent/bend)
+    const softDepth = onSlime ? 0.2 : obj.shape === "butter" ? 0.07 : 0
+    goal.current.set(gx, gy + obj.halfHeight, gz)
 
     if (!inited.current) {
       g.position.copy(goal.current)
@@ -347,6 +353,20 @@ export default function Character() {
     }
     p.scale.set(SPRITE_W * facing.current, SPRITE_H, 1)
     if (falling && mode.current === "drop") p.rotation.z = spin.current * facing.current
+
+    // rest into a soft surface: the cat descends by however much the surface gives
+    // beneath it (goo dents, butter bends) — the SAME spring the bar uses — so the
+    // bar's give carries the cat down. Eases back out as it steps off.
+    const airborne = jumping.current && tt < 1 // mid-hop between words
+    const grounded = softDepth > 0 && mode.current === "move" && !airborne
+    const sinkTarget = grounded ? softDepth : 0
+    const ds = Math.min(dt, 1 / 30)
+    sinkV.current += ((sinkTarget - sinkY.current) * 150 - sinkV.current * 15) * ds
+    sinkY.current = Math.max(0, sinkY.current + sinkV.current * ds)
+    if (sinkY.current > 0.0005) {
+      const idle = onSlime ? Math.sin(performance.now() / 520) * 0.015 * (sinkY.current / 0.2) : 0
+      g.position.y -= sinkY.current + idle
+    }
 
     charWorldPos.copy(g.position)
   })

@@ -583,35 +583,31 @@ class AudioEngine {
     }
 
     if (sound === "butter") {
-      // butter physics: spreading friction — creamy low-passed noise smear, then faint sticky ticks
-      const src = ctx.createBufferSource()
-      src.buffer = this.noiseBuf
-      src.loop = true
-      const lp = ctx.createBiquadFilter()
-      lp.type = "lowpass"
-      lp.frequency.setValueAtTime(500, t)
-      lp.frequency.exponentialRampToValueAtTime(180, t + 0.26)
-      const g = ctx.createGain()
-      g.gain.setValueAtTime(0.0001, t)
-      g.gain.exponentialRampToValueAtTime(0.18, t + 0.03)
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3)
-      src.connect(lp).connect(g).connect(out)
-      src.start(t)
-      src.stop(t + 0.33)
-      // low body under the smear
-      const osc = ctx.createOscillator()
-      osc.type = "sine"
-      osc.frequency.value = Math.max(80, freq * 0.5)
+      // stepping on hard cold butter: a THONK (woody resonant knock) that snaps
+      // straight into a dry CRACK as the slab fractures underfoot.
+      const dry = this.pan(pan, false)
+      // (1) thonk — punchy woody low-mid resonant body, fast tight decay
+      const body = ctx.createOscillator()
+      body.type = "sine"
+      body.frequency.setValueAtTime(Math.max(150, freq * 0.5), t)
+      body.frequency.exponentialRampToValueAtTime(Math.max(84, freq * 0.32), t + 0.09)
+      const bp = ctx.createBiquadFilter()
+      bp.type = "bandpass"
+      bp.frequency.value = 165
+      bp.Q.value = 4
       const bg = ctx.createGain()
       bg.gain.setValueAtTime(0.0001, t)
-      bg.gain.exponentialRampToValueAtTime(0.06, t + 0.03)
-      bg.gain.exponentialRampToValueAtTime(0.0001, t + 0.2)
-      osc.connect(bg).connect(out)
-      osc.start(t)
-      osc.stop(t + 0.22)
-      // sticky release ticks
-      this.noiseBurst(out, t + 0.17, { type: "highpass", freq: 2600, gain: 0.032, decay: 0.01 })
-      this.noiseBurst(out, t + 0.23, { type: "highpass", freq: 3200, gain: 0.026, decay: 0.008 })
+      bg.gain.exponentialRampToValueAtTime(0.32, t + 0.005)
+      bg.gain.exponentialRampToValueAtTime(0.0001, t + 0.12)
+      body.connect(bp).connect(bg).connect(out)
+      body.start(t)
+      body.stop(t + 0.14)
+      // (2) woody knock transient — the "t" of the thonk
+      this.noiseBurst(out, t, { type: "bandpass", freq: 1150, Q: 1.4, gain: 0.14, attack: 0.001, decay: 0.03 })
+      // (3) the crack — a sharp dry fracture snapping right after the knock
+      this.noiseBurst(dry, t + 0.008, { type: "bandpass", freq: 2300, Q: 2.4, gain: 0.16, decay: 0.016 })
+      this.noiseBurst(dry, t + 0.028, { type: "bandpass", freq: 3200, Q: 2.6, gain: 0.1, decay: 0.012 })
+      this.noiseBurst(dry, t + 0.05, { type: "bandpass", freq: 2700, Q: 2.2, gain: 0.06, decay: 0.01 })
       return
     }
 
