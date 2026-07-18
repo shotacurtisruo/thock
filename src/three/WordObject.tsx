@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber"
 import { RoundedBox } from "@react-three/drei"
 import type { Group, Mesh, Material } from "three"
 import { GAP, type ClimbObject, type Shape } from "../game/config"
-import ObjectMesh from "./ObjectMesh"
+import ObjectMesh, { ButterStick, SlimeBlob } from "./ObjectMesh"
 
 export type Variant = "segmented" | "long"
 export { GAP }
@@ -215,6 +215,23 @@ export default function WordObject({ object, word, variant, blobSlot = -1, typed
   }
 
   // long: continuous walkable platform of detailed objects, one per letter, no labels
+  // butter is a special case — one seamless stick spanning the whole word.
+  if (object.shape === "butter") {
+    return (
+      <group>
+        <ButterStick object={object} n={n} gap={GAP} caret={caret} crossed={crossed} />
+      </group>
+    )
+  }
+  // slime is one continuous gooey platform, randomized per word.
+  if (object.shape === "slime") {
+    const seed = word.split("").reduce((a, c, i) => a + c.charCodeAt(0) * (i + 1), n)
+    return (
+      <group>
+        <SlimeBlob object={object} n={n} gap={GAP} seed={seed} caret={caret} />
+      </group>
+    )
+  }
   return (
     <group>
       {isKeycap && <KeyboardBase n={n} />}
