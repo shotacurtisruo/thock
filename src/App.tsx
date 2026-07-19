@@ -132,7 +132,7 @@ export default function App() {
         style={{ backgroundImage: `linear-gradient(180deg, ${weather.sky[0]} 0%, ${weather.sky[1]} 45%, ${weather.sky[2]} 100%)` }}
       >
         <Scene />
-        <div className="brand">thock</div>
+        <div className="brand">typemaxxing</div>
         <div className="top-right">
           <div className="coin-chip" title="Coins — find them floating on rare platforms">
             <span className="coin-ico">🪙</span>

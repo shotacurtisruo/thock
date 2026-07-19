@@ -39,7 +39,7 @@ export default function Gallery() {
         backgroundImage: "linear-gradient(180deg, #eaf1ff 0%, #f3ecff 55%, #fff2f6 100%)",
       }}
     >
-      <div className="gallery-title">THOCK · object gallery</div>
+      <div className="gallery-title">TYPEMAXXING · object gallery</div>
       <Canvas dpr={[1, 2]} gl={{ alpha: true, antialias: true }} camera={{ position: [0, 0, 9.5], fov: 45 }}>
         <ambientLight intensity={0.9} />
         <hemisphereLight args={["#ffffff", "#d8c9ff", 0.6]} />
