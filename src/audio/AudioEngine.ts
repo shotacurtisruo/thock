@@ -1,7 +1,7 @@
 import { freqFor, type Impact, type MaterialSound } from "../game/config"
 
 /**
- * Web Audio synthesis engine — the soul of Thock.
+ * Web Audio synthesis engine — the soul of typemaxxing.
  * Two layers per keystroke: a mechanical switch "thock" + the material "squish",
  * pitched to a rising pentatonic scale, positioned in 3D (HRTF binaural),
  * with a flow-driven reverb tail and a subtle ambience bed.

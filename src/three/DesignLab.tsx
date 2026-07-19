@@ -46,7 +46,7 @@ export default function DesignLab() {
 
   return (
     <div style={{ position: "fixed", inset: 0, backgroundImage: "linear-gradient(180deg,#eef3ff 0%,#f4edff 55%,#fff2f6 100%)" }}>
-      <div className="gallery-title">THOCK · design lab</div>
+      <div className="gallery-title">TYPEMAXXING · design lab</div>
       <div className="lab-sub">one word = one object · blob runs across → jumps on space</div>
 
       <Canvas dpr={[1, 2]} gl={{ alpha: true, antialias: true }} camera={{ position: [0, 1.4, 8], fov: 42 }}>

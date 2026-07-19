@@ -33,7 +33,7 @@ export default function KeycapGallery() {
         backgroundImage: "linear-gradient(180deg, #eef3ff 0%, #f4edff 55%, #fff2f6 100%)",
       }}
     >
-      <div className="gallery-title">THOCK · keycap profiles</div>
+      <div className="gallery-title">TYPEMAXXING · keycap profiles</div>
       <div style={{ position: "absolute", top: 44, left: 24, zIndex: 2, fontFamily: "var(--mono)", fontSize: 12, letterSpacing: 2, color: "rgba(58,47,79,0.45)" }}>
         top row = thocky · bottom row = creamy
       </div>
