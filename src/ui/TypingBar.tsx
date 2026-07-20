@@ -24,10 +24,18 @@ export default function TypingBar() {
     return () => cancelAnimationFrame(raf)
   }, [wi, ci, words])
 
+  // window the rendered text so the DOM stays small on a long endless run
+  const lo = Math.max(0, wi - 8)
+  const hi = Math.min(words.length, wi + 40)
+  const win: number[] = []
+  for (let w = lo; w < hi; w++) win.push(w)
+
   return (
     <div className="passage">
       <div className="passage-inner" ref={inner}>
-        {words.map((word, w) => (
+        {win.map((w) => {
+          const word = words[w]
+          return (
           <span key={w} className="word">
             {word.split("").map((ch, i) => {
               const mark = marks[w]?.[i] ?? 0
@@ -48,7 +56,8 @@ export default function TypingBar() {
               {" "}
             </span>
           </span>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

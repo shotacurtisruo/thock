@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { generatePassage } from "./passage"
-import { objectFor, weatherFor, layoutAngles, passageArc, coinAt, type ClimbObject, type Weather } from "./config"
+import { objectFor, weatherFor, layoutAngles, coinAt, type ClimbObject, type Weather } from "./config"
 import { SKINS, DEFAULT_SKIN, skinById } from "./skins"
 
 /** Per-letter state: 0 = untyped, 1 = correct, 2 = wrong (red). */
@@ -121,7 +121,30 @@ function loadOwned(): string[] {
 const FLOW_GAIN = 0.045
 const FLOW_LOSS = 0.25
 
+// Endless stream: always keep at least this many words buffered beyond the
+// caret so the render window (Tower) never runs out and never has to "swap".
+const LOOKAHEAD = 24
+
 const newSeed = () => Math.floor(Math.random() * 997)
+
+/** Extend the word/marks/angles stream so it stays LOOKAHEAD words ahead of the
+ *  caret. Existing indices keep their exact positions (layout is deterministic
+ *  from index 0), so nothing already on screen shifts or remounts. */
+function extendStream(words: string[], marks: Mark[][], angles: number[], wi: number) {
+  if (words.length - wi > LOOKAHEAD) return { words, marks, angles }
+  const batch = generatePassage().split(" ")
+  const nextWords = words.concat(batch)
+  const nextMarks = marks.concat(batch.map((w) => Array<Mark>(w.length).fill(0)))
+  return { words: nextWords, marks: nextMarks, angles: layoutAngles(nextWords, 0) }
+}
+
+/** Copy the marks grid cheaply: shallow-clone the outer array + deep-clone only
+ *  the one row being edited. Stays O(row) per keystroke even as the stream grows. */
+function touchMarks(marks: Mark[][], wi: number): Mark[][] {
+  const next = marks.slice()
+  next[wi] = [...marks[wi]]
+  return next
+}
 
 function fresh(arcBase = 0) {
   const passage = generatePassage()
@@ -288,7 +311,7 @@ export const useGame = create<GameState>((set, get) => ({
         return { kind: "none", slip: false, worldIndex: W, object: oF(W), slot: s.ci, flow: s.flow }
 
       // remainder of the word is skipped -> marked red (counts once toward falls)
-      const marks = s.marks.map((m) => [...m])
+      const marks = touchMarks(s.marks, s.wi)
       let skipped = 0
       for (let i = s.ci; i < word.length; i++) {
         if (marks[s.wi][i] === 0) {
@@ -303,34 +326,19 @@ export const useGame = create<GameState>((set, get) => ({
         return doFall(set, s, { marks, keystrokes, startTime, errors: s.errors + skipped })
       }
 
-      // advance to the next word (roll a fresh passage at the end)
-      let wi = s.wi + 1
-      let words = s.words
-      let baseWord = s.baseWord
-      let nextMarks = marks
-      let angles = s.angles
-      let arcBase = s.arcBase
-      if (wi >= words.length) {
-        baseWord += words.length
-        arcBase = s.arcBase + passageArc(s.words) // continue the spiral
-        const f = fresh(arcBase)
-        words = f.words
-        nextMarks = f.marks
-        angles = f.angles
-        wi = 0
-      }
-      const nextW = baseWord + wi
+      // advance to the next word; the stream extends ahead so it never "swaps"
+      const wi = s.wi + 1
+      const ext = extendStream(s.words, marks, s.angles, wi)
+      const nextW = wi // baseWord stays 0 — wi is the absolute word index
       const nextWeather = weatherFor(nextW + s.seed)
       const changed = nextWeather.name !== s.weather.name
       const streak = skipped ? 0 : s.streak + 1
       set({
-        words,
-        marks: nextMarks,
-        angles,
-        arcBase,
+        words: ext.words,
+        marks: ext.marks,
+        angles: ext.angles,
         wi,
         ci: 0,
-        baseWord,
         freshReds,
         keystrokes,
         errors: s.errors + skipped,
@@ -353,7 +361,7 @@ export const useGame = create<GameState>((set, get) => ({
     }
 
     const ok = char === word[s.ci]
-    const marks = s.marks.map((m) => [...m])
+    const marks = touchMarks(s.marks, s.wi)
     marks[s.wi][s.ci] = ok ? 1 : 2
     const ci = s.ci + 1
     const keystrokes = s.keystrokes + 1
@@ -397,7 +405,7 @@ export const useGame = create<GameState>((set, get) => ({
     if (s.phase === "done") return null
     if (s.ci === 0) return null
     const ci = s.ci - 1
-    const marks = s.marks.map((m) => [...m])
+    const marks = touchMarks(s.marks, s.wi)
     const wasRed = marks[s.wi][ci] === 2
     marks[s.wi][ci] = 0
     set({
