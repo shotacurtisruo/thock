@@ -14,12 +14,14 @@ export default function Dialog({
   children,
   className = "",
   labelId = "dialog-title",
+  restoreFocus = true,
 }: {
   title: string
   onClose: () => void
   children: ReactNode
   className?: string
   labelId?: string
+  restoreFocus?: boolean
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
@@ -63,9 +65,9 @@ export default function Dialog({
     document.addEventListener("keydown", onKey, true)
     return () => {
       document.removeEventListener("keydown", onKey, true)
-      opener?.focus?.() // restore focus to whoever opened us
+      if (restoreFocus) opener?.focus?.()
     }
-  }, [])
+  }, [restoreFocus])
 
   return (
     <div className="cz-backdrop" onMouseDown={onClose}>

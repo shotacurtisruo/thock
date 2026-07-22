@@ -32,6 +32,12 @@ export default function App() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const anyModal = customizing || settingsOpen || onboarding || phase === "done"
+  const closeSettings = () => {
+    // Keep this inside the close gesture so browsers allow the hidden gameplay
+    // input to reclaim focus immediately (especially Safari/mobile browsers).
+    inputRef.current?.focus({ preventScroll: true })
+    setSettingsOpen(false)
+  }
 
   // keep the audio mix in sync with settings (applies once the ctx exists)
   useEffect(() => {
@@ -137,7 +143,7 @@ export default function App() {
         </div>
 
         {customizing && <Customizer onClose={() => setCustomizing(false)} />}
-        {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} onReplayTutorial={() => setOnboarding(true)} />}
+        {settingsOpen && <Settings onClose={closeSettings} onReplayTutorial={() => setOnboarding(true)} />}
         {onboarding && <Onboarding onClose={() => setOnboarding(false)} />}
 
         {!started && !anyModal && (

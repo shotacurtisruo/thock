@@ -98,4 +98,31 @@ describe("Dialog focus management", () => {
 
     expect(document.activeElement).toBe(host.querySelector("textarea"))
   })
+
+  it("can leave focus restoration to a game-specific close handler", () => {
+    host = document.createElement("div")
+    document.body.appendChild(host)
+    root = createRoot(host)
+    const gameplay = document.createElement("textarea")
+    document.body.appendChild(gameplay)
+
+    act(() => {
+      root?.render(
+        createElement(
+          Dialog,
+          {
+            title: "Settings",
+            restoreFocus: false,
+            onClose: () => gameplay.focus(),
+          },
+          createElement("button", { type: "button" }, "setting"),
+        ),
+      )
+    })
+
+    const backdrop = host.querySelector<HTMLDivElement>(".cz-backdrop")!
+    act(() => backdrop.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })))
+    expect(document.activeElement).toBe(gameplay)
+    gameplay.remove()
+  })
 })
