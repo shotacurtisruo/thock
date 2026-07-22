@@ -23,6 +23,7 @@ class MemoryStorage {
 }
 
 const g = globalThis as unknown as { localStorage?: Storage }
+;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 if (typeof g.localStorage === "undefined" || typeof g.localStorage.clear !== "function") {
   Object.defineProperty(globalThis, "localStorage", {
     value: new MemoryStorage(),

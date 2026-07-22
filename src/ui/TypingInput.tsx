@@ -85,8 +85,17 @@ export default function TypingInput({
   useEffect(() => {
     const el = inputRef.current
     if (!el) return
-    if (suppressed) el.blur()
-    else el.focus()
+    if (suppressed) {
+      el.blur()
+      return
+    }
+
+    // Focus immediately, then once more after dialog unmount cleanups have
+    // restored focus to their opener. The deferred pass wins that cleanup race
+    // and makes typing ready as soon as a modal closes.
+    el.focus({ preventScroll: true })
+    const frame = requestAnimationFrame(() => el.focus({ preventScroll: true }))
+    return () => cancelAnimationFrame(frame)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suppressed])
 

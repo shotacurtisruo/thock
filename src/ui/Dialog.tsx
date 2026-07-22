@@ -22,6 +22,14 @@ export default function Dialog({
   labelId?: string
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+
+  // Parent components commonly pass an inline close callback. Keep the latest
+  // callback without restarting the focus-management effect on every parent
+  // render (settings changes re-render App on each click).
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null
@@ -34,7 +42,7 @@ export default function Dialog({
       if (e.key === "Escape") {
         e.preventDefault()
         e.stopPropagation()
-        onClose()
+        onCloseRef.current()
         return
       }
       if (e.key !== "Tab" || !panel) return
@@ -57,7 +65,7 @@ export default function Dialog({
       document.removeEventListener("keydown", onKey, true)
       opener?.focus?.() // restore focus to whoever opened us
     }
-  }, [onClose])
+  }, [])
 
   return (
     <div className="cz-backdrop" onMouseDown={onClose}>
