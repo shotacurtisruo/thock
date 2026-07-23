@@ -25,6 +25,9 @@ const RED_LIMIT =
 export const CHECKPOINT_EVERY = 22
 // coins awarded each time a checkpoint is crossed
 export const CHECKPOINT_COINS = 5
+// bigger payoff every this many words: a milestone (camera reveal + PB marker)
+export const MILESTONE_EVERY = 100
+export const MILESTONE_COINS = 25
 
 export type GameMode = PersistMode // "zen" | 15 | 30 | 60 | 120
 export type Phase = "idle" | "running" | "done"
@@ -91,6 +94,10 @@ interface GameState {
   checkpointNonce: number // bumps when a checkpoint is crossed (drives the toast)
   checkpointBiome: string // material name of the just-reached checkpoint
   checkpointReward: number // coins awarded by the last checkpoint
+  milestone: number // highest milestone reached this run (every MILESTONE_EVERY words)
+  milestoneNonce: number // bumps when a milestone is crossed (drives the banner + camera reveal)
+  milestoneHeight: number // height (m) of the just-reached milestone
+  milestonePb: boolean // was that milestone a new personal-best height?
   ownedSkins: string[]
   collected: Record<number, true>
   coinNonce: number
@@ -177,6 +184,10 @@ function clearedRun() {
     checkpointNonce: 0,
     checkpointBiome: "",
     checkpointReward: 0,
+    milestone: 0,
+    milestoneNonce: 0,
+    milestoneHeight: 0,
+    milestonePb: false,
   }
 }
 
@@ -374,9 +385,10 @@ export const useGame = create<GameState>((set, get) => ({
       const streak = skipped ? 0 : s.streak + 1
 
       // ---- checkpoint crossing: a brief non-blocking payoff every N words ----
-      const cpBefore = Math.floor((s.baseWord + s.wi) / CHECKPOINT_EVERY)
+      // Gate against the highest checkpoint already awarded THIS RUN (not a local
+      // floor transition) so falling back and re-climbing can't farm the reward.
       const cpAfter = Math.floor(nextW / CHECKPOINT_EVERY)
-      const crossed = cpAfter > cpBefore && cpAfter > 0
+      const crossed = cpAfter > s.checkpoint
       const cp = crossed
         ? {
             coins: s.coins + CHECKPOINT_COINS,
@@ -389,6 +401,28 @@ export const useGame = create<GameState>((set, get) => ({
           }
         : {}
       if (crossed) saveState({ coins: (cp as { coins: number }).coins, checkpointBest: Math.max(loadState().checkpointBest, cpAfter) })
+
+      // ---- milestone crossing: a bigger, PB-aware payoff every 100 words ----
+      // Same "highest awarded this run" gate so falls can't re-farm the reward.
+      const msAfter = Math.floor(nextW / MILESTONE_EVERY)
+      const hitMilestone = msAfter > s.milestone
+      const coinsAfterCp = crossed ? (cp as { coins: number }).coins : s.coins
+      const coinsRunAfterCp = crossed ? (cp as { coinsRun: number }).coinsRun : s.coinsRun
+      const msHeight = Math.round(nextW * 1.05)
+      const ms = hitMilestone
+        ? {
+            coins: coinsAfterCp + MILESTONE_COINS,
+            coinsRun: coinsRunAfterCp + MILESTONE_COINS,
+            coinNonce: s.coinNonce + 1,
+            milestone: msAfter,
+            milestoneNonce: s.milestoneNonce + 1,
+            milestoneHeight: msHeight,
+            milestonePb: msHeight > loadState().bestHeight,
+          }
+        : {}
+      if (hitMilestone) {
+        saveState({ coins: (ms as { coins: number }).coins, bestHeight: Math.max(loadState().bestHeight, msHeight) })
+      }
 
       set({
         words: ext.words,
@@ -407,6 +441,7 @@ export const useGame = create<GameState>((set, get) => ({
         prevWeather: changed ? s.weather : s.prevWeather,
         weatherAt: changed ? Date.now() : s.weatherAt,
         ...cp,
+        ...ms,
       })
       return { kind: "jump", slip: false, worldIndex: nextW, object: oF(nextW), slot: 0, flow: get().flow }
     }

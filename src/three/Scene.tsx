@@ -1,9 +1,9 @@
 import { Canvas, useFrame } from "@react-three/fiber"
-import { Suspense, useRef, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import { Vector3, Color, type Fog, type DirectionalLight } from "three"
 import { useGame } from "../game/store"
 import { objectFor, slotWorldPos, wordCenter } from "../game/config"
-import { charWorldPos, shakeBus } from "./sceneBus"
+import { charWorldPos, shakeBus, revealBus, triggerReveal } from "./sceneBus"
 import { detectTier, downgrade, qualityFromTier, motion, type Tier } from "../game/quality"
 import Tower from "./Tower"
 import Character from "./Character"
@@ -67,11 +67,21 @@ function ClimbCamera() {
     const clen = Math.hypot(cx, cz) || 1
     const ox = cx / clen
     const oz = cz / clen
-    const dist = 8 + len * 0.45 // pull back for longer words
+    let dist = 8 + len * 0.45 // pull back for longer words
+    let lift = CAM_LIFT
+
+    // milestone reveal: ease a brief pull-back out and back (0 → max → 0),
+    // kept modest so the tower stays framed the whole time
+    if (revealBus.t > 0) {
+      revealBus.t = Math.max(0, revealBus.t - dt / 2)
+      const pull = Math.sin((1 - revealBus.t) * Math.PI) // bump over the 2s window
+      dist += pull * 3
+      lift += pull * 1.2
+    }
 
     // reduced motion: gentler, steadier framing (no fast fall-tracking lurches)
     if (motion.reduced) speed = Math.min(speed, 1.8)
-    camPos.current.set(fx + ox * dist, top + CAM_LIFT, fz + oz * dist)
+    camPos.current.set(fx + ox * dist, top + lift, fz + oz * dist)
     camera.position.lerp(camPos.current, Math.min(1, dt * speed))
 
     // decaying landing shake — suppressed entirely under reduced motion
@@ -121,6 +131,12 @@ export default function Scene() {
   const setting = useGame((s) => s.settings.quality)
   const [autoTier, setAutoTier] = useState<Tier>(detectTier)
   const tier: Tier = setting === "auto" ? autoTier : setting
+
+  // a milestone triggers a brief camera pull-back (skipped under reduced motion)
+  const milestoneNonce = useGame((s) => s.milestoneNonce)
+  useEffect(() => {
+    if (milestoneNonce > 0 && !motion.reduced) triggerReveal()
+  }, [milestoneNonce])
   const q = qualityFromTier(tier)
   // under reduced motion, weather particles are killed outright (motion-heavy)
   const particleScale = motion.reduced ? 0 : q.particleScale

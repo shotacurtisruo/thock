@@ -31,6 +31,10 @@ function setup(words: string[], opts: { mode?: GameMode; strictFalls?: boolean }
     checkpointNonce: 0,
     checkpointBiome: "",
     checkpointReward: 0,
+    milestone: 0,
+    milestoneNonce: 0,
+    milestoneHeight: 0,
+    milestonePb: false,
   })
 }
 
@@ -190,6 +194,39 @@ describe("store — run lifecycle", () => {
     useGame.getState().press(" ")
     expect(st().checkpoint).toBe(1)
     expect(st().coins).toBe(coinsBefore + 5)
+  })
+
+  it("does NOT re-award a checkpoint after falling below it and re-climbing", () => {
+    setup(Array(26).fill("a"), { mode: 15 })
+    for (let i = 0; i < 22; i++) {
+      useGame.getState().press("a")
+      useGame.getState().press(" ")
+    }
+    expect(st().checkpoint).toBe(1)
+    const coinsAfterAward = st().coins
+    // simulate a fall back below the boundary (doFall rewinds wi, keeps checkpoint)
+    useGame.setState({ wi: 20, ci: 0 })
+    // re-climb across word 22 again
+    for (let i = 0; i < 2; i++) {
+      useGame.getState().press("a")
+      useGame.getState().press(" ")
+    }
+    expect(st().wi).toBe(22)
+    expect(st().checkpoint).toBe(1)
+    expect(st().coins).toBe(coinsAfterAward) // no farming
+  })
+
+  it("crossing a milestone awards a bigger reward + records height", () => {
+    setup(Array(102).fill("a"), { mode: "zen" })
+    // realistic climbed state at word 99: checkpoints 1-4 already awarded
+    useGame.setState({ wi: 99, ci: 1, checkpoint: 4, coins: 0, coinsRun: 0 })
+    useGame.getState().press(" ") // -> wi 100 crosses milestone 1 (word 100 is NOT a new checkpoint)
+    expect(st().wi).toBe(100)
+    expect(st().milestone).toBe(1)
+    expect(st().milestoneNonce).toBe(1)
+    expect(st().milestoneHeight).toBe(Math.round(100 * 1.05))
+    expect(st().coins).toBe(25) // milestone only, no double checkpoint
+    expect(typeof st().milestonePb).toBe("boolean")
   })
 
   it("pause/resume shifts the clock so paused time is not counted", () => {

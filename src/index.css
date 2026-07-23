@@ -892,6 +892,39 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visib
   .cp-toast { animation: none; }
 }
 
+/* ---------------- milestone banner ---------------- */
+.ms-banner {
+  position: absolute;
+  top: 26%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 34px;
+  border-radius: 18px;
+  background: rgba(9, 7, 18, 0.6);
+  border: 1px solid rgba(255, 207, 58, 0.5);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 34px -8px rgba(255, 207, 58, 0.6);
+  backdrop-filter: blur(8px);
+  font-family: var(--mono);
+  animation: ms-in 0.5s var(--ease-spring), ms-out 0.5s var(--ease-calm) 2.1s forwards;
+}
+.ms-banner.pb { border-color: rgba(95, 240, 208, 0.6); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 34px -8px rgba(95, 240, 208, 0.6); }
+.ms-star { color: var(--gold); font-size: 18px; }
+.ms-banner.pb .ms-star { color: var(--accent); }
+.ms-height { font-size: 40px; font-weight: 700; color: var(--ink); line-height: 1; }
+.ms-label { font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); }
+.ms-banner.pb .ms-label { color: var(--accent); }
+@keyframes ms-in { from { transform: translateX(-50%) translateY(-10px) scale(0.9); opacity: 0; } }
+@keyframes ms-out { to { transform: translateX(-50%) translateY(-6px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .ms-banner { animation: none; }
+}
+
 /* ---------------- responsive + safe-area ---------------- */
 .brand { top: max(18px, env(safe-area-inset-top)); left: max(22px, env(safe-area-inset-left)); }
 .top-right { top: max(16px, env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); flex-wrap: wrap; justify-content: flex-end; max-width: min(92vw, 520px); }

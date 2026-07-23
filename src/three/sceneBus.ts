@@ -9,3 +9,10 @@ export const shakeBus = { v: 0 }
 export function shake(intensity: number) {
   shakeBus.v = Math.max(shakeBus.v, intensity)
 }
+
+/** Milestone camera reveal impulse (0..1). Camera eases a pull-back while > 0. */
+export const revealBus = { t: 0 }
+
+export function triggerReveal() {
+  revealBus.t = 1
+}

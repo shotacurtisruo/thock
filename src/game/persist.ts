@@ -74,6 +74,7 @@ export interface PersistState {
   tutorialSeen: boolean
   checkpointBest: number
   bestWpm: number
+  bestHeight: number
   history: RunHistoryEntry[]
 }
 
@@ -92,6 +93,7 @@ function defaults(): PersistState {
     tutorialSeen: false,
     checkpointBest: 0,
     bestWpm: 0,
+    bestHeight: 0,
     history: [],
   }
 }
@@ -199,7 +201,7 @@ export function pushHistory(entry: RunHistoryEntry): RunHistoryEntry[] {
 /** Reset to a clean guest profile (keeps settings + tutorial-seen). */
 export function clearProgress() {
   const cur = loadState()
-  saveState({ coins: 0, ownedSkins: ["cat"], character: { ...DEFAULT_CHARACTER }, checkpointBest: 0, bestWpm: 0, history: [] })
+  saveState({ coins: 0, ownedSkins: ["cat"], character: { ...DEFAULT_CHARACTER }, checkpointBest: 0, bestWpm: 0, bestHeight: 0, history: [] })
   return cur
 }
 

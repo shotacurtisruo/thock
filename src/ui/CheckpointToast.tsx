@@ -17,7 +17,10 @@ export default function CheckpointToast() {
   const [show, setShow] = useState(false)
 
   useEffect(() => {
-    if (nonce === 0) return // ignore the reset/initial state
+    if (nonce === 0) {
+      setShow(false) // a run reset clears any toast still on screen
+      return
+    }
     audio.playCheckpoint(0)
     setShow(true)
     const t = setTimeout(() => setShow(false), 2000)

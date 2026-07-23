@@ -403,6 +403,41 @@ class AudioEngine {
     this.noiseBurst(out, t + 0.05, { type: "highpass", freq: 7000, gain: 0.05, decay: 0.14 })
   }
 
+  /** Reaching a 100-word milestone: a warm, resolving major cadence (bass root +
+   *  sustained triad) that reads as an "arrival" — bigger than a checkpoint. */
+  playMilestone(pan = 0) {
+    const ctx = this.ctx
+    if (!ctx) return
+    const t = ctx.currentTime
+    const out = this.pan(pan, true)
+    const root = 130.81 // C3 bass
+    const bass = ctx.createOscillator()
+    bass.type = "sine"
+    bass.frequency.value = root
+    const bg = ctx.createGain()
+    bg.gain.setValueAtTime(0.0001, t)
+    bg.gain.exponentialRampToValueAtTime(0.14, t + 0.02)
+    bg.gain.exponentialRampToValueAtTime(0.0001, t + 1.1)
+    bass.connect(bg).connect(out)
+    bass.start(t)
+    bass.stop(t + 1.15)
+    // sustained triad up top, gently staggered so it "blooms"
+    ;[523.25, 659.25, 783.99].forEach((f, i) => {
+      const o = ctx.createOscillator()
+      o.type = "triangle"
+      o.frequency.value = f
+      const g = ctx.createGain()
+      const ts = t + i * 0.05
+      g.gain.setValueAtTime(0.0001, ts)
+      g.gain.exponentialRampToValueAtTime(0.1, ts + 0.03)
+      g.gain.exponentialRampToValueAtTime(0.0001, ts + 1.0)
+      o.connect(g).connect(out)
+      o.start(ts)
+      o.stop(ts + 1.05)
+    })
+    this.noiseBurst(out, t + 0.04, { type: "highpass", freq: 6500, gain: 0.06, decay: 0.2 })
+  }
+
   /** A fresh crack forming in ice on landing: a brittle propagating micro-crackle. */
   playCrack(pan = 0) {
     const ctx = this.ctx
