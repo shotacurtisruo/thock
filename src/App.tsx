@@ -10,6 +10,7 @@ import Customizer from "./ui/Customizer"
 import Settings from "./ui/Settings"
 import Onboarding from "./ui/Onboarding"
 import Results from "./ui/Results"
+import CheckpointToast from "./ui/CheckpointToast"
 import { AuthButtons } from "./auth/Auth"
 import { coinURL } from "./three/Character"
 import { useGame } from "./game/store"
@@ -138,6 +139,7 @@ export default function App() {
       >
         <Scene />
         <div className="brand">typemaxxing</div>
+        <CheckpointToast />
         <div className="top-right">
           <div className="coin-chip tactile" ref={coinChip} title="Coins — find them floating on rare platforms">
             <img className="coin-px coin-ico" src={coinURL()} alt="coins" draggable={false} />

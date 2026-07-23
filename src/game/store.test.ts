@@ -27,6 +27,10 @@ function setup(words: string[], opts: { mode?: GameMode; strictFalls?: boolean }
     settings: { ...DEFAULT_SETTINGS, strictFalls: opts.strictFalls ?? false },
     collected: {},
     coinsRun: 0,
+    checkpoint: 0,
+    checkpointNonce: 0,
+    checkpointBiome: "",
+    checkpointReward: 0,
   })
 }
 
@@ -166,6 +170,26 @@ describe("store — run lifecycle", () => {
     useGame.getState().finishSession()
     expect(st().phase).toBe("done")
     expect(st().results?.mode).toBe("zen")
+  })
+
+  it("crossing a checkpoint awards coins once and persists the best", () => {
+    setup(Array(24).fill("a"), { mode: "zen" })
+    const coinsBefore = st().coins
+    for (let i = 0; i < 22; i++) {
+      useGame.getState().press("a")
+      useGame.getState().press(" ")
+    }
+    expect(st().wi).toBe(22)
+    expect(st().checkpoint).toBe(1)
+    expect(st().checkpointNonce).toBe(1)
+    expect(st().checkpointBiome).not.toBe("")
+    expect(st().coins).toBe(coinsBefore + 5)
+    expect(st().coinsRun).toBeGreaterThanOrEqual(5)
+    // one more word must NOT re-award (still checkpoint 1)
+    useGame.getState().press("a")
+    useGame.getState().press(" ")
+    expect(st().checkpoint).toBe(1)
+    expect(st().coins).toBe(coinsBefore + 5)
   })
 
   it("pause/resume shifts the clock so paused time is not counted", () => {

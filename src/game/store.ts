@@ -23,6 +23,8 @@ const RED_LIMIT =
 
 // one checkpoint per this many completed words (P1 payoff cadence)
 export const CHECKPOINT_EVERY = 22
+// coins awarded each time a checkpoint is crossed
+export const CHECKPOINT_COINS = 5
 
 export type GameMode = PersistMode // "zen" | 15 | 30 | 60 | 120
 export type Phase = "idle" | "running" | "done"
@@ -85,6 +87,10 @@ interface GameState {
   slipAt: number
   coins: number
   coinsRun: number // coins collected in the current run (for results)
+  checkpoint: number // highest checkpoint reached this run
+  checkpointNonce: number // bumps when a checkpoint is crossed (drives the toast)
+  checkpointBiome: string // material name of the just-reached checkpoint
+  checkpointReward: number // coins awarded by the last checkpoint
   ownedSkins: string[]
   collected: Record<number, true>
   coinNonce: number
@@ -167,6 +173,10 @@ function clearedRun() {
     results: null,
     collected: {},
     coinsRun: 0,
+    checkpoint: 0,
+    checkpointNonce: 0,
+    checkpointBiome: "",
+    checkpointReward: 0,
   }
 }
 
@@ -362,6 +372,24 @@ export const useGame = create<GameState>((set, get) => ({
       const nextWeather = weatherFor(nextW + s.seed)
       const changed = nextWeather.name !== s.weather.name
       const streak = skipped ? 0 : s.streak + 1
+
+      // ---- checkpoint crossing: a brief non-blocking payoff every N words ----
+      const cpBefore = Math.floor((s.baseWord + s.wi) / CHECKPOINT_EVERY)
+      const cpAfter = Math.floor(nextW / CHECKPOINT_EVERY)
+      const crossed = cpAfter > cpBefore && cpAfter > 0
+      const cp = crossed
+        ? {
+            coins: s.coins + CHECKPOINT_COINS,
+            coinsRun: s.coinsRun + CHECKPOINT_COINS,
+            coinNonce: s.coinNonce + 1,
+            checkpoint: cpAfter,
+            checkpointNonce: s.checkpointNonce + 1,
+            checkpointBiome: oF(nextW).name,
+            checkpointReward: CHECKPOINT_COINS,
+          }
+        : {}
+      if (crossed) saveState({ coins: (cp as { coins: number }).coins, checkpointBest: Math.max(loadState().checkpointBest, cpAfter) })
+
       set({
         words: ext.words,
         marks: ext.marks,
@@ -378,6 +406,7 @@ export const useGame = create<GameState>((set, get) => ({
         weather: nextWeather,
         prevWeather: changed ? s.weather : s.prevWeather,
         weatherAt: changed ? Date.now() : s.weatherAt,
+        ...cp,
       })
       return { kind: "jump", slip: false, worldIndex: nextW, object: oF(nextW), slot: 0, flow: get().flow }
     }

@@ -380,6 +380,29 @@ class AudioEngine {
     this.noiseBurst(out, t + 0.02, { type: "highpass", freq: 6000, gain: 0.04, decay: 0.05 })
   }
 
+  /** Reaching a checkpoint: a warm ascending pentatonic arpeggio + shimmer. */
+  playCheckpoint(pan = 0) {
+    const ctx = this.ctx
+    if (!ctx) return
+    const t = ctx.currentTime
+    const out = this.pan(pan, true)
+    const notes = [523.25, 659.25, 783.99, 1046.5] // C5 E5 G5 C6 (major triad up an octave)
+    notes.forEach((f, i) => {
+      const o = ctx.createOscillator()
+      o.type = "triangle"
+      o.frequency.value = f
+      const g = ctx.createGain()
+      const ts = t + i * 0.085
+      g.gain.setValueAtTime(0.0001, ts)
+      g.gain.exponentialRampToValueAtTime(0.12, ts + 0.01)
+      g.gain.exponentialRampToValueAtTime(0.0001, ts + 0.5)
+      o.connect(g).connect(out)
+      o.start(ts)
+      o.stop(ts + 0.55)
+    })
+    this.noiseBurst(out, t + 0.05, { type: "highpass", freq: 7000, gain: 0.05, decay: 0.14 })
+  }
+
   /** A fresh crack forming in ice on landing: a brittle propagating micro-crackle. */
   playCrack(pan = 0) {
     const ctx = this.ctx
